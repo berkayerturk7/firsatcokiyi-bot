@@ -1,0 +1,6 @@
+Pillow
+requests
+schedule
+duckduckgo-search
+python-dotenv
+groq

@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Output (generated images)
+output/
+assets/photos/
+assets/fonts/
+
+# macOS
+.DS_Store

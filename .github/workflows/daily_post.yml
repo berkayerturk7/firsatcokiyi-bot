@@ -1,0 +1,41 @@
+name: Günlük Instagram Post
+
+on:
+  schedule:
+    # Her gün 06:00 UTC = 09:00 Türkiye saati (UTC+3)
+    - cron: "0 6 * * *"
+  workflow_dispatch:  # Manuel tetikleme için
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: Python kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Bağımlılıkları kur
+        run: pip install -r requirements.txt
+
+      - name: Sistem fontlarını kur
+        run: |
+          sudo apt-get install -y fonts-liberation fonts-dejavu-core
+          fc-cache -f -v
+
+      - name: Output klasörü oluştur
+        run: mkdir -p output assets/photos assets/fonts
+
+      - name: Günlük post at
+        env:
+          INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python main.py --now

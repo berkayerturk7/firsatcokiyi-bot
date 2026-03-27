@@ -427,14 +427,6 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     bar_y = SH - BAR_H
     y = bar_y
 
-    # Kaynak linki yönlendirme
-    f_swipe = _load_font(32, bold=True)
-    swipe_text = "↑  Detaylar için linke tıkla"
-    sw2 = int(draw.textlength(swipe_text, font=f_swipe))
-    y -= 50
-    draw.text(((SW - sw2) // 2, y), swipe_text, font=f_swipe, fill=acc_rgb)
-    y -= 20
-
     # Özellikler
     ozellikler = deal.get("ozellikler", [])
     if ozellikler:

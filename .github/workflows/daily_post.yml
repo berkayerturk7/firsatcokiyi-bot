@@ -2,8 +2,8 @@ name: Günlük Instagram Post
 
 on:
   schedule:
-    # Her gün 06:00 UTC = 09:00 Türkiye saati (UTC+3)
-    - cron: "0 6 * * *"
+    # Her gün 07:30 UTC = 10:30 Türkiye saati (UTC+3)
+    - cron: "30 7 * * *"
   workflow_dispatch:  # Manuel tetikleme için
 
 jobs:

@@ -203,15 +203,15 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     draw.rectangle([(0, 0), (7, HEIGHT)], fill=acc_rgb)
 
     # ── Üst bölüm: Badge + Tarih ────────────────────────────────
-    f_badge = _load_font(34, bold=True)
+    f_badge = _load_font(38, bold=True)
     badge_text = cat_name.upper()
-    bw = int(draw.textlength(badge_text, font=f_badge)) + 50
-    bh = 58
+    bw = int(draw.textlength(badge_text, font=f_badge)) + 52
+    bh = 64
     bx, by = PAD, 52
-    draw.rounded_rectangle([(bx, by), (bx + bw, by + bh)], radius=29, fill=acc_rgb)
-    draw.text((bx + 25, by + 12), badge_text, font=f_badge, fill=(255, 255, 255))
+    draw.rounded_rectangle([(bx, by), (bx + bw, by + bh)], radius=32, fill=acc_rgb)
+    draw.text((bx + 26, by + 13), badge_text, font=f_badge, fill=(255, 255, 255))
 
-    f_date = _load_font(28)
+    f_date = _load_font(32)
     date_str = datetime.now().strftime("%d.%m.%Y")
     dw = int(draw.textlength(date_str, font=f_date))
     draw.text((WIDTH - dw - PAD, 66), date_str, font=f_date, fill=(200, 200, 200))
@@ -223,15 +223,15 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     # Özellikler (bullet points)
     ozellikler = deal.get("ozellikler", [])
     if ozellikler:
-        f_oz = _load_font(34)
+        f_oz = _load_font(40)
         for oz in reversed(ozellikler[:3]):
-            y -= 54
-            draw.ellipse([(PAD, y + 12), (PAD + 12, y + 24)], fill=acc_rgb)
-            draw.text((PAD + 24, y), oz[:55], font=f_oz, fill=(215, 215, 215))
+            y -= 60
+            draw.ellipse([(PAD, y + 14), (PAD + 14, y + 28)], fill=acc_rgb)
+            draw.text((PAD + 28, y), oz[:52], font=f_oz, fill=(215, 215, 215))
         y -= 16
-        f_label = _load_font(28, bold=True)
-        draw.text((PAD, y - 32), "KAMPANYA KOŞULLARI", font=f_label, fill=acc_rgb)
-        y -= 44
+        f_label = _load_font(32, bold=True)
+        draw.text((PAD, y - 36), "KAMPANYA KOŞULLARI", font=f_label, fill=acc_rgb)
+        y -= 48
 
     # Ayırıcı
     draw.rectangle([(PAD, y), (WIDTH - PAD, y + 1)], fill=(*acc_rgb, 120))
@@ -241,57 +241,57 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     eski = deal.get("eski_fiyat")
     yeni = deal.get("yeni_fiyat")
     if eski and yeni:
-        f_yeni = _load_font(86, bold=True)
+        f_yeni = _load_font(94, bold=True)
         yeni_text = f"{yeni} TL"
         yw = int(draw.textlength(yeni_text, font=f_yeni))
-        y -= 92
+        y -= 100
         draw.text((PAD, y), yeni_text, font=f_yeni, fill=(255, 255, 255))
 
-        f_eski = _load_font(50)
+        f_eski = _load_font(54)
         eski_text = f"{eski} TL"
         ew = int(draw.textlength(eski_text, font=f_eski))
-        draw.text((PAD + yw + 22, y + 26), eski_text, font=f_eski, fill=(140, 140, 140))
-        mid = y + 26 + 25
+        draw.text((PAD + yw + 22, y + 28), eski_text, font=f_eski, fill=(140, 140, 140))
+        mid = y + 28 + 27
         draw.line([(PAD + yw + 22, mid), (PAD + yw + 22 + ew, mid)], fill=(140, 140, 140), width=3)
         y -= 8
     elif yeni:
-        f_yeni = _load_font(86, bold=True)
-        y -= 96
+        f_yeni = _load_font(94, bold=True)
+        y -= 104
         draw.text((PAD, y), f"{yeni} TL", font=f_yeni, fill=(255, 255, 255))
         y -= 8
 
     # Kampanya detayı (büyük vurgu)
     kampanya_detay = deal.get("kampanya_detay", "")
     if kampanya_detay and not (eski or yeni):
-        f_kd = _load_font(80, bold=True)
+        f_kd = _load_font(86, bold=True)
         for line in reversed(_wrap(kampanya_detay, f_kd, WIDTH - PAD * 2, draw)):
-            y -= 96
+            y -= 104
             draw.text((PAD, y), line, font=f_kd, fill=acc_rgb)
         y -= 8
 
     # Açıklama
     aciklama = deal.get("aciklama", "")
     if aciklama:
-        f_desc = _load_font(38)
+        f_desc = _load_font(44)
         for line in reversed(_wrap(aciklama, f_desc, WIDTH - PAD * 2, draw)):
-            y -= 54
+            y -= 62
             draw.text((PAD, y), line, font=f_desc, fill=(205, 205, 205))
         y -= 14
 
     # Başlık
     baslik = deal.get("baslik", "")
     if baslik:
-        f_title = _load_font(64, bold=True)
+        f_title = _load_font(72, bold=True)
         for line in reversed(_wrap(baslik, f_title, WIDTH - PAD * 2, draw)):
-            y -= 80
+            y -= 90
             draw.text((PAD, y), line, font=f_title, fill=(255, 255, 255))
         y -= 14
 
     # Marka
     marka = deal.get("marka", "")
     if marka:
-        f_brand = _load_font(44, bold=True)
-        y -= 58
+        f_brand = _load_font(50, bold=True)
+        y -= 64
         draw.text((PAD, y), marka.upper(), font=f_brand, fill=acc_rgb)
 
     # İndirim rozeti (sağ orta)
@@ -299,14 +299,14 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     if indirim:
         cx, cy, r = WIDTH - 155, HEIGHT // 2 - 60, 150
         draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=acc_rgb)
-        f_pct = _load_font(70, bold=True)
-        f_off = _load_font(32, bold=True)
+        f_pct = _load_font(78, bold=True)
+        f_off = _load_font(36, bold=True)
         pct_text = f"%{indirim}"
         pw = int(draw.textlength(pct_text, font=f_pct))
-        draw.text((cx - pw // 2, cy - 55), pct_text, font=f_pct, fill=(255, 255, 255))
+        draw.text((cx - pw // 2, cy - 58), pct_text, font=f_pct, fill=(255, 255, 255))
         off_text = "İNDİRİM"
         ow = int(draw.textlength(off_text, font=f_off))
-        draw.text((cx - ow // 2, cy + 24), off_text, font=f_off, fill=(255, 255, 255))
+        draw.text((cx - ow // 2, cy + 28), off_text, font=f_off, fill=(255, 255, 255))
 
     # ── Alt bar ─────────────────────────────────────────────────
     BAR_H = 90
@@ -396,31 +396,31 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     draw.rectangle([(0, 0), (8, SH)], fill=acc_rgb)
 
     # ── Üst alan: Kategori badge + tarih ───────────────────────
-    f_badge = _load_font(36, bold=True)
+    f_badge = _load_font(46, bold=True)
     badge_text = cat_name.upper()
-    bw = int(draw.textlength(badge_text, font=f_badge)) + 52
-    bh = 62
-    draw.rounded_rectangle([(PAD, 80), (PAD + bw, 80 + bh)], radius=31, fill=acc_rgb)
-    draw.text((PAD + 26, 93), badge_text, font=f_badge, fill=(255, 255, 255))
+    bw = int(draw.textlength(badge_text, font=f_badge)) + 60
+    bh = 74
+    draw.rounded_rectangle([(PAD, 80), (PAD + bw, 80 + bh)], radius=37, fill=acc_rgb)
+    draw.text((PAD + 30, 93), badge_text, font=f_badge, fill=(255, 255, 255))
 
-    f_date = _load_font(30)
+    f_date = _load_font(38)
     date_str = datetime.now().strftime("%d.%m.%Y")
     dw = int(draw.textlength(date_str, font=f_date))
-    draw.text((SW - dw - PAD, 94), date_str, font=f_date, fill=(190, 190, 190))
+    draw.text((SW - dw - PAD, 97), date_str, font=f_date, fill=(190, 190, 190))
 
     # ── Orta alan: büyük indirim rozeti ────────────────────────
     indirim = deal.get("indirim_orani")
     if indirim:
-        cx, cy, r = SW // 2, SH // 2 - 80, 200
+        cx, cy, r = SW // 2, SH // 2 - 80, 230
         draw.ellipse([(cx-r, cy-r), (cx+r, cy+r)], fill=acc_rgb)
-        f_pct = _load_font(110, bold=True)
-        f_off = _load_font(42, bold=True)
+        f_pct = _load_font(136, bold=True)
+        f_off = _load_font(54, bold=True)
         pt = f"%{indirim}"
         pw = int(draw.textlength(pt, font=f_pct))
-        draw.text((cx - pw//2, cy - 90), pt, font=f_pct, fill=(255, 255, 255))
+        draw.text((cx - pw//2, cy - 112), pt, font=f_pct, fill=(255, 255, 255))
         ot = "İNDİRİM"
         ow = int(draw.textlength(ot, font=f_off))
-        draw.text((cx - ow//2, cy + 34), ot, font=f_off, fill=(255, 255, 255))
+        draw.text((cx - ow//2, cy + 44), ot, font=f_off, fill=(255, 255, 255))
 
     # ── Alt alan: içerik ────────────────────────────────────────
     BAR_H = 100
@@ -430,16 +430,16 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     # Özellikler
     ozellikler = deal.get("ozellikler", [])
     if ozellikler:
-        f_oz = _load_font(36)
+        f_oz = _load_font(46)
         for oz in reversed(ozellikler[:3]):
-            y -= 58
-            draw.ellipse([(PAD, y+14), (PAD+12, y+26)], fill=acc_rgb)
-            draw.text((PAD+24, y), oz[:50], font=f_oz, fill=(215, 215, 215))
-        y -= 20
+            y -= 70
+            draw.ellipse([(PAD, y+16), (PAD+16, y+32)], fill=acc_rgb)
+            draw.text((PAD+30, y), oz[:48], font=f_oz, fill=(215, 215, 215))
+        y -= 24
 
     # Ayırıcı
     draw.rectangle([(PAD, y), (SW-PAD, y+1)], fill=(*acc_rgb, 100))
-    y -= 24
+    y -= 28
 
     # Kampanya detayı / fiyat
     kampanya_detay = deal.get("kampanya_detay", "")
@@ -447,51 +447,51 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     yeni = deal.get("yeni_fiyat")
 
     if eski and yeni:
-        f_yeni = _load_font(100, bold=True)
+        f_yeni = _load_font(118, bold=True)
         yt = f"{yeni} TL"
         yw = int(draw.textlength(yt, font=f_yeni))
-        y -= 108
+        y -= 126
         draw.text((PAD, y), yt, font=f_yeni, fill=(255, 255, 255))
-        f_eski = _load_font(54)
+        f_eski = _load_font(64)
         et = f"{eski} TL"
         ew = int(draw.textlength(et, font=f_eski))
-        draw.text((PAD + yw + 24, y + 32), et, font=f_eski, fill=(130, 130, 130))
-        draw.line([(PAD+yw+24, y+60), (PAD+yw+24+ew, y+60)], fill=(130, 130, 130), width=3)
+        draw.text((PAD + yw + 26, y + 36), et, font=f_eski, fill=(130, 130, 130))
+        draw.line([(PAD+yw+26, y+68), (PAD+yw+26+ew, y+68)], fill=(130, 130, 130), width=3)
         y -= 10
     elif yeni:
-        f_yeni = _load_font(100, bold=True)
-        y -= 112
+        f_yeni = _load_font(118, bold=True)
+        y -= 130
         draw.text((PAD, y), f"{yeni} TL", font=f_yeni, fill=(255, 255, 255))
     elif kampanya_detay:
-        f_kd = _load_font(90, bold=True)
+        f_kd = _load_font(106, bold=True)
         for line in reversed(_wrap(kampanya_detay, f_kd, SW - PAD*2, draw)):
-            y -= 108
+            y -= 124
             draw.text((PAD, y), line, font=f_kd, fill=acc_rgb)
         y -= 10
 
     # Açıklama
     aciklama = deal.get("aciklama", "")
     if aciklama:
-        f_desc = _load_font(40)
+        f_desc = _load_font(52)
         for line in reversed(_wrap(aciklama, f_desc, SW - PAD*2, draw)):
-            y -= 58
+            y -= 72
             draw.text((PAD, y), line, font=f_desc, fill=(200, 200, 200))
         y -= 14
 
     # Başlık
     baslik = deal.get("baslik", "")
     if baslik:
-        f_title = _load_font(72, bold=True)
+        f_title = _load_font(90, bold=True)
         for line in reversed(_wrap(baslik, f_title, SW - PAD*2, draw)):
-            y -= 90
+            y -= 110
             draw.text((PAD, y), line, font=f_title, fill=(255, 255, 255))
         y -= 14
 
     # Marka
     marka = deal.get("marka", "")
     if marka:
-        f_brand = _load_font(50, bold=True)
-        y -= 68
+        f_brand = _load_font(64, bold=True)
+        y -= 82
         draw.text((PAD, y), marka.upper(), font=f_brand, fill=acc_rgb)
 
     # Alt bar
@@ -503,14 +503,14 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     draw.rectangle([(0, bar_y), (SW, bar_y+3)], fill=acc_rgb)
 
     # "fırsat çok iyi" yazısı alt bar
-    f_bl = _load_font(36)
-    f_bb = _load_font(36, bold=True)
+    f_bl = _load_font(44)
+    f_bb = _load_font(44, bold=True)
     lt = "fırsat"
     bt = "çok iyi"
     lw2 = int(draw.textlength(lt, font=f_bl))
     bw3 = int(draw.textlength(bt, font=f_bb))
     tx = (SW - lw2 - bw3 - 6) // 2
-    ty = bar_y + (BAR_H - 40) // 2
+    ty = bar_y + (BAR_H - 48) // 2
     draw.text((tx, ty), lt, font=f_bl, fill=(200, 200, 200))
     draw.text((tx + lw2 + 6, ty), bt, font=f_bb, fill=acc_rgb)
 

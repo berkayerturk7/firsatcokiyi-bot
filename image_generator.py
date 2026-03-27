@@ -25,14 +25,36 @@ CATEGORIES_META = {
 }
 
 SYSTEM_FONTS = [
+    # macOS
     "/System/Library/Fonts/HelveticaNeue.ttc",
     "/System/Library/Fonts/Helvetica.ttc",
     "/Library/Fonts/Arial.ttf",
+    # Linux (Ubuntu/Debian) — fonts-liberation
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    # Linux — fonts-dejavu-core
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    # Linux — noto
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+]
+
+SYSTEM_FONTS_BOLD = [
+    # macOS
+    "/System/Library/Fonts/HelveticaNeue.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/Library/Fonts/Arial Bold.ttf",
+    # Linux
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
 ]
 
 def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     FONTS_DIR.mkdir(parents=True, exist_ok=True)
-    for path in SYSTEM_FONTS:
+    font_list = SYSTEM_FONTS_BOLD if bold else SYSTEM_FONTS
+    for path in font_list:
         if os.path.exists(path):
             try:
                 idx = 1 if (bold and path.endswith(".ttc")) else 0
@@ -42,6 +64,7 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
                     return ImageFont.truetype(path, size)
                 except Exception:
                     continue
+    # Inter fallback — indir veya cache'den kullan
     font_file = FONTS_DIR / ("Inter-Bold.ttf" if bold else "Inter-Regular.ttf")
     if not font_file.exists():
         url = (
@@ -50,14 +73,17 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
             "https://github.com/rsms/inter/releases/download/v4.0/Inter-Regular.ttf"
         )
         try:
-            r = requests.get(url, timeout=15)
-            font_file.write_bytes(r.content)
+            r = requests.get(url, timeout=30)
+            if r.status_code == 200:
+                font_file.write_bytes(r.content)
         except Exception:
-            return ImageFont.load_default()
-    try:
-        return ImageFont.truetype(str(font_file), size)
-    except Exception:
-        return ImageFont.load_default()
+            pass
+    if font_file.exists():
+        try:
+            return ImageFont.truetype(str(font_file), size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
 
 def _hex(h: str) -> tuple:
     h = h.lstrip("#")

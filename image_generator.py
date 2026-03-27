@@ -242,13 +242,13 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     yeni = deal.get("yeni_fiyat")
     if eski and yeni:
         f_yeni = _load_font(86, bold=True)
-        yeni_text = f"\u20ba{yeni}"
+        yeni_text = f"{yeni} TL"
         yw = int(draw.textlength(yeni_text, font=f_yeni))
         y -= 92
         draw.text((PAD, y), yeni_text, font=f_yeni, fill=(255, 255, 255))
 
         f_eski = _load_font(50)
-        eski_text = f"\u20ba{eski}"
+        eski_text = f"{eski} TL"
         ew = int(draw.textlength(eski_text, font=f_eski))
         draw.text((PAD + yw + 22, y + 26), eski_text, font=f_eski, fill=(140, 140, 140))
         mid = y + 26 + 25
@@ -257,7 +257,7 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     elif yeni:
         f_yeni = _load_font(86, bold=True)
         y -= 96
-        draw.text((PAD, y), f"\u20ba{yeni}", font=f_yeni, fill=(255, 255, 255))
+        draw.text((PAD, y), f"{yeni} TL", font=f_yeni, fill=(255, 255, 255))
         y -= 8
 
     # Kampanya detayı (büyük vurgu)
@@ -448,12 +448,12 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
 
     if eski and yeni:
         f_yeni = _load_font(100, bold=True)
-        yt = f"\u20ba{yeni}"
+        yt = f"{yeni} TL"
         yw = int(draw.textlength(yt, font=f_yeni))
         y -= 108
         draw.text((PAD, y), yt, font=f_yeni, fill=(255, 255, 255))
         f_eski = _load_font(54)
-        et = f"\u20ba{eski}"
+        et = f"{eski} TL"
         ew = int(draw.textlength(et, font=f_eski))
         draw.text((PAD + yw + 24, y + 32), et, font=f_eski, fill=(130, 130, 130))
         draw.line([(PAD+yw+24, y+60), (PAD+yw+24+ew, y+60)], fill=(130, 130, 130), width=3)
@@ -461,7 +461,7 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
     elif yeni:
         f_yeni = _load_font(100, bold=True)
         y -= 112
-        draw.text((PAD, y), f"\u20ba{yeni}", font=f_yeni, fill=(255, 255, 255))
+        draw.text((PAD, y), f"{yeni} TL", font=f_yeni, fill=(255, 255, 255))
     elif kampanya_detay:
         f_kd = _load_font(90, bold=True)
         for line in reversed(_wrap(kampanya_detay, f_kd, SW - PAD*2, draw)):

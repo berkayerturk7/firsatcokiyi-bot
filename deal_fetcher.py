@@ -57,33 +57,35 @@ def fetch_deal(category_name: str) -> dict | None:
         for r in results[:6]
     )
 
-    prompt = f"""Sen bir kampanya editörüsün. Aşağıdaki arama sonuçlarından "{category_name}" kategorisinde EN SPESİFİK ve EN SOMUT fırsatı çıkar.
+    prompt = f"""Sen bir kampanya editörüsün. Aşağıdaki arama sonuçlarından "{category_name}" kategorisinde bir fırsat/kampanya çıkar.
 
-Önemli: Gerçek rakamlar, gerçek markalar, gerçek koşullar kullan. Örneğin:
-- "Axess kredi kartıyla MediaMarkt'ta Samsung TV'de %30 indirim"
-- "THY'de yurt içi uçuşlarda Kuveyt Türk kartına 2.000 TL nakit iade"
-- "Trendyol'da ilk siparişe 200 TL indirim kuponu"
+KRİTİK KURAL: SADECE aşağıdaki arama sonuçlarında açıkça yazan bilgileri kullan.
+- Arama sonuçlarında geçmeyen hiçbir rakam, tarih, koşul veya marka adı YAZMA.
+- Eğer fiyat bilgisi yoksa eski_fiyat ve yeni_fiyat null olsun.
+- Eğer indirim oranı açıkça belirtilmemişse indirim_orani null olsun.
+- Kampanya koşullarını (ozellikler) sadece metinde geçenlerden yaz; yoksa boş dizi döndür.
+- kaynak_url MUTLAKA arama sonuçlarındaki gerçek bir URL olmalı. URL yoksa tüm yanıtı null döndür.
 
 Arama sonuçları:
 {results_text}
 
-SADECE geçerli JSON döndür:
+SADECE geçerli JSON döndür (veya hiç uygun kaynak yoksa sadece null döndür):
 {{
-    "baslik": "Spesifik kampanya başlığı — marka+ürün+avantaj içersin (max 55 karakter)",
-    "marka": "Ana marka adı",
-    "aciklama": "Kampanyanın tam koşulu tek cümleyle (max 90 karakter)",
-    "eski_fiyat": "Eski fiyat rakamı (varsa, yoksa null)",
-    "yeni_fiyat": "Yeni fiyat rakamı (varsa, yoksa null)",
-    "indirim_orani": "İndirim yüzdesi (varsa sadece sayı, yoksa null)",
-    "kampanya_detay": "Ana kampanya avantajı (örn: '2.000 TL nakit iade', '%30 indirim', '6 taksit')",
+    "baslik": "Spesifik kampanya başlığı — marka+avantaj içersin, sadece kaynaktaki bilgi (max 55 karakter)",
+    "marka": "Ana marka adı (kaynakta geçen)",
+    "aciklama": "Kampanyanın koşulu — SADECE kaynakta yazan bilgi, tek cümle (max 90 karakter)",
+    "eski_fiyat": "Eski fiyat rakamı (kaynakta geçiyorsa, yoksa null)",
+    "yeni_fiyat": "Yeni fiyat rakamı (kaynakta geçiyorsa, yoksa null)",
+    "indirim_orani": "İndirim yüzdesi (kaynakta geçiyorsa sadece sayı, yoksa null)",
+    "kampanya_detay": "Ana kampanya avantajı (SADECE kaynakta geçen, örn: '%30 indirim', '6 taksit')",
     "ozellikler": [
-        "Kampanya koşulu 1 (örn: 'Minimum 2.000 TL alışveriş şartı')",
-        "Kampanya koşulu 2 (örn: 'Sadece Axess kart sahiplerine özel')",
-        "Kampanya koşulu 3 (örn: '31 Mart'a kadar geçerli')"
+        "Kaynakta geçen kampanya koşulu 1",
+        "Kaynakta geçen kampanya koşulu 2",
+        "Kaynakta geçen kampanya koşulu 3"
     ],
-    "kaynak_url": "Kaynak URL",
+    "kaynak_url": "Arama sonuçlarındaki gerçek URL (ZORUNLU)",
     "kaynak_adi": "Kaynak site adı",
-    "caption": "Instagram açıklaması — Türkçe, heyecan verici, spesifik rakamlar kullan, emoji ekle, hashtag ekle, kaynak URL sona (max 400 karakter)"
+    "caption": "Instagram açıklaması — Türkçe, heyecan verici, sadece doğrulanmış bilgiler, emoji ekle, hashtag ekle, kaynak URL sona (max 400 karakter)"
 }}"""
 
     try:
@@ -91,14 +93,28 @@ SADECE geçerli JSON döndür:
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=900,
-            temperature=0.2,
+            temperature=0.1,
         )
         text = response.choices[0].message.content.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
-        return json.loads(text)
+
+        # Boş veya null yanıt kontrolü
+        if text.lower() in ("null", "none", ""):
+            print(f"  Kaynak bulunamadı, atlandı ({category_name})")
+            return None
+
+        deal = json.loads(text)
+
+        # Kaynak URL zorunlu — yoksa deal'i geçersiz say
+        kaynak = deal.get("kaynak_url", "")
+        if not kaynak or kaynak in ("null", "None", "") or not kaynak.startswith("http"):
+            print(f"  Doğrulanmış kaynak URL yok, atlandı ({category_name})")
+            return None
+
+        return deal
     except Exception as e:
         print(f"  Groq hatası ({category_name}): {e}")
         return None

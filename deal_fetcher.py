@@ -1,50 +1,116 @@
 import json
 import os
+import re
+import requests
 from groq import Groq
 from duckduckgo_search import DDGS
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Haber/kampanya odaklı spesifik arama sorguları
+# Güvenilir Türk haber ve kampanya siteleri — sadece buralardan kabul et
+TRUSTED_SITES = [
+    # Teknoloji haberleri
+    "webtekno.com", "donanimhaber.com", "technopat.net", "shiftdelete.net",
+    "chip.com.tr", "hwp.com.tr", "pcworld.com.tr", "log.com.tr",
+    # E-ticaret / karşılaştırma
+    "akakce.com", "cimri.com", "incehesap.com",
+    # Mağazalar
+    "mediamarkt.com.tr", "teknosa.com", "vatanbilgisayar.com",
+    "trendyol.com", "hepsiburada.com", "n11.com", "gittigidiyor.com",
+    "a101.com.tr", "bim.com.tr", "migros.com.tr", "carrefoursa.com",
+    "watsons.com.tr", "gratis.com", "lcw.com", "decathlon.com.tr",
+    "ikea.com", "ciceksepeti.com",
+    # Havacılık
+    "thy.com", "turkishairlines.com", "pegasusairlines.com", "anadolujet.com",
+    # Turizm
+    "tatilsepeti.com", "etstur.com", "jolly.com.tr", "obilet.com",
+    # Yemek
+    "yemeksepeti.com", "getir.com",
+    # Akaryakıt / Otomotiv
+    "petrolofisi.com.tr", "opet.com.tr", "shell.com.tr", "bp.com.tr",
+    # Haber siteleri
+    "hurriyet.com.tr", "sabah.com.tr", "milliyet.com.tr",
+    "ntv.com.tr", "cnnturk.com", "haberturk.com",
+    "bloomberght.com", "ekonomim.com", "paraanaliz.com",
+]
+
 SEARCH_QUERIES = {
-    "E-Ticaret":         "trendyol hepsiburada n11 kampanya indirim 2026 site:webtekno.com OR site:shiftdelete.net OR site:technopat.net OR site:donanimhaber.com",
+    "E-Ticaret":         "trendyol hepsiburada n11 kampanya indirim fırsat 2026",
     "Havacılık":         "thy pegasus anadolujet uçak bileti kampanya indirim fırsat 2026",
     "Yemek":             "yemeksepeti getir trendyol yemek indirim kampanya fırsat 2026",
     "Giyim & Moda":      "lcwaikiki mango zara h&m giyim kampanya indirim 2026",
     "Teknoloji":         "mediamarkt teknosa vatan samsung apple indirim kampanya 2026",
     "Sağlık & Güzellik": "watsons gratis farmasi kozmetik cilt bakım kampanya indirim 2026",
-    "Ev & Yaşam":        "ikea çiçeksepeti trendyol ev mobilya indirim kampanya 2026",
+    "Ev & Yaşam":        "ikea ciceksepeti trendyol ev mobilya indirim kampanya 2026",
     "Spor":              "decathlon intersport spor malzeme indirim kampanya fırsat 2026",
     "Turizm & Otel":     "tatilsepeti etstur jolly otel tatil erken rezervasyon kampanya 2026",
-    "Otomotiv":          "petrol ofisi opet shell akaryakıt aksesuarı araç kampanya indirim 2026",
+    "Otomotiv":          "petrol ofisi opet shell akaryakıt araç kampanya indirim 2026",
 }
 
-def fetch_deal(category_name: str) -> dict | None:
-    query = SEARCH_QUERIES.get(category_name, f"{category_name} kampanya indirim türkiye 2026")
 
-    # Önce haber arama dene, sonra genel arama
+def _is_trusted(url: str) -> bool:
+    return any(site in url for site in TRUSTED_SITES)
+
+
+def _fetch_page_text(url: str, max_chars: int = 3500) -> str:
+    """URL'deki sayfanın düz metnini çeker. HTML, script ve style temizlenir."""
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "tr-TR,tr;q=0.9",
+        }
+        resp = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        if resp.status_code != 200:
+            return ""
+        html = resp.text
+        # Script, style, nav, footer gibi gürültülü blokları kaldır
+        for tag in ("script", "style", "nav", "footer", "header", "aside", "iframe"):
+            html = re.sub(
+                rf"<{tag}[^>]*>.*?</{tag}>", "", html,
+                flags=re.DOTALL | re.IGNORECASE
+            )
+        # Kalan HTML taglarını boşlukla değiştir
+        text = re.sub(r"<[^>]+>", " ", html)
+        # Çok sayıda boşluk/satır sonunu tek boşluğa indir
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_chars]
+    except Exception as e:
+        print(f"  Sayfa çekilemedi ({url[:60]}): {e}")
+        return ""
+
+
+def fetch_deal(category_name: str) -> dict | None:
+    query = SEARCH_QUERIES.get(
+        category_name, f"{category_name} kampanya indirim türkiye 2026"
+    )
+
+    # 1) DuckDuckGo haber araması
     results = []
     try:
         with DDGS() as ddgs:
-            # Haber araması — daha güncel ve spesifik sonuçlar
-            for r in ddgs.news(query, region="tr-tr", max_results=5):
+            for r in ddgs.news(query, region="tr-tr", max_results=8):
                 results.append({
                     "title": r.get("title", ""),
                     "body":  r.get("body", ""),
-                    "href":  r.get("url", ""),
+                    "url":   r.get("url", ""),
                     "date":  r.get("date", ""),
                 })
     except Exception:
         pass
 
+    # 2) Yeterli sonuç yoksa metin aramasıyla tamamla
     if len(results) < 3:
         try:
             with DDGS() as ddgs:
-                for r in ddgs.text(query, region="tr-tr", max_results=5):
+                for r in ddgs.text(query, region="tr-tr", max_results=8):
                     results.append({
                         "title": r.get("title", ""),
                         "body":  r.get("body", ""),
-                        "href":  r.get("href", ""),
+                        "url":   r.get("href", ""),
                     })
         except Exception as e:
             print(f"  Arama hatası ({category_name}): {e}")
@@ -52,69 +118,116 @@ def fetch_deal(category_name: str) -> dict | None:
     if not results:
         return None
 
-    results_text = "\n\n".join(
-        f"Başlık: {r['title']}\nİçerik: {r['body']}\nURL: {r['href']}"
-        for r in results[:6]
+    # 3) Güvenilir siteleri öne al
+    trusted  = [r for r in results if _is_trusted(r.get("url", ""))]
+    others   = [r for r in results if not _is_trusted(r.get("url", ""))]
+    sorted_r = (trusted + others)[:6]
+
+    # 4) En iyi 3 URL'den tam sayfa metnini çekmeyi dene
+    page_content = ""
+    source_url   = ""
+    for r in sorted_r[:3]:
+        url = r.get("url", "")
+        if not url or not url.startswith("http"):
+            continue
+        content = _fetch_page_text(url)
+        if len(content) > 300:          # Yeterli içerik
+            page_content = content
+            source_url   = url
+            trust_tag    = "✓ güvenilir" if _is_trusted(url) else "? bilinmeyen"
+            print(f"  Sayfa çekildi [{trust_tag}]: {url[:70]} ({len(content)} kar)")
+            break
+
+    # 5) Snippetler (özet)
+    snippets_text = "\n\n".join(
+        f"[{i+1}] Başlık: {r['title']}\n"
+        f"    Özet  : {r['body']}\n"
+        f"    URL   : {r.get('url', '')}"
+        for i, r in enumerate(sorted_r[:5])
     )
 
-    prompt = f"""Sen bir kampanya editörüsün. Aşağıdaki arama sonuçlarından "{category_name}" kategorisinde bir fırsat/kampanya çıkar.
+    # 6) Tam sayfa metni varsa ekle
+    page_section = ""
+    if page_content:
+        page_section = (
+            f"\n\n=== KAYNAK SAYFANIN TAM METNİ ===\n"
+            f"URL: {source_url}\n\n"
+            f"{page_content}\n"
+            f"=== KAYNAK SAYFA SONU ===\n"
+        )
 
-KRİTİK KURAL: SADECE aşağıdaki arama sonuçlarında açıkça yazan bilgileri kullan.
-- Arama sonuçlarında geçmeyen hiçbir rakam, tarih, koşul veya marka adı YAZMA.
-- Eğer fiyat bilgisi yoksa eski_fiyat ve yeni_fiyat null olsun.
-- Eğer indirim oranı açıkça belirtilmemişse indirim_orani null olsun.
-- Kampanya koşullarını (ozellikler) sadece metinde geçenlerden yaz; yoksa boş dizi döndür.
-- kaynak_url MUTLAKA arama sonuçlarındaki gerçek bir URL olmalı. URL yoksa tüm yanıtı null döndür.
+    prompt = f"""Sen bir kampanya editörüsün. Aşağıdaki GERÇEK kaynak metinlerden \
+"{category_name}" kategorisinde bir fırsat/kampanya çıkar.
 
-Arama sonuçları:
-{results_text}
+KRİTİK KURALLAR — BUNLARA MUTLAKA UY:
+1. SADECE aşağıdaki kaynak metinlerde kelimesi kelimesine yazan bilgileri kullan. \
+   Hiçbir şey tahmin etme, uydurma.
+2. Fiyat, tarih, indirim oranı: SADECE kaynakta açık rakam varsa doldur; yoksa null.
+3. "kaynak_alinti" alanı ZORUNLU — kampanyayı doğrulayan TAM cümleyi kaynaktan kopyala.
+4. Güvenilir, spesifik bir kampanya bulamazsan tüm yanıtı null döndür.
 
-SADECE geçerli JSON döndür (veya hiç uygun kaynak yoksa sadece null döndür):
+--- ARAMA SONUÇLARI ---
+{snippets_text}
+{page_section}
+--- ARAMA SONU ---
+
+SADECE geçerli JSON döndür (uygun kaynak yoksa sadece null):
 {{
-    "baslik": "Spesifik kampanya başlığı — marka+avantaj içersin, sadece kaynaktaki bilgi (max 55 karakter)",
+    "baslik": "Spesifik kampanya başlığı (kaynakta geçen bilgi, max 55 karakter)",
     "marka": "Ana marka adı (kaynakta geçen)",
-    "aciklama": "Kampanyanın koşulu — SADECE kaynakta yazan bilgi, tek cümle (max 90 karakter)",
-    "eski_fiyat": "Eski fiyat rakamı (kaynakta geçiyorsa, yoksa null)",
-    "yeni_fiyat": "Yeni fiyat rakamı (kaynakta geçiyorsa, yoksa null)",
-    "indirim_orani": "İndirim yüzdesi (kaynakta geçiyorsa sadece sayı, yoksa null)",
-    "kampanya_detay": "Ana kampanya avantajı (SADECE kaynakta geçen, örn: '%30 indirim', '6 taksit')",
+    "aciklama": "Kampanya açıklaması — SADECE kaynakta yazan bilgi, tek cümle (max 90 karakter)",
+    "eski_fiyat": "Eski fiyat rakamı (kaynakta açıkça varsa, yoksa null)",
+    "yeni_fiyat": "Yeni fiyat rakamı (kaynakta açıkça varsa, yoksa null)",
+    "indirim_orani": "İndirim yüzdesi (kaynakta açıkça varsa sadece sayı, yoksa null)",
+    "kampanya_detay": "Ana avantaj — SADECE kaynakta geçen bilgi (örn: '%30 indirim', '9 TL bilet')",
     "ozellikler": [
-        "Kaynakta geçen kampanya koşulu 1",
-        "Kaynakta geçen kampanya koşulu 2",
-        "Kaynakta geçen kampanya koşulu 3"
+        "Kaynakta geçen koşul/detay 1",
+        "Kaynakta geçen koşul/detay 2",
+        "Kaynakta geçen koşul/detay 3"
     ],
-    "kaynak_url": "Arama sonuçlarındaki gerçek URL (ZORUNLU)",
+    "kaynak_alinti": "Kampanyayı doğrulayan kaynaktaki TAM cümle — kelimesi kelimesine kopyala (ZORUNLU)",
+    "kaynak_url": "Kaynağın gerçek URL'si (ZORUNLU)",
     "kaynak_adi": "Kaynak site adı",
-    "caption": "Instagram açıklaması — Türkçe, heyecan verici, sadece doğrulanmış bilgiler, emoji ekle, hashtag ekle, kaynak URL sona (max 400 karakter)"
+    "caption": "Instagram açıklaması (Türkçe, heyecanlı, SADECE doğrulanmış bilgiler, emoji+hashtag, URL sona, max 400 karakter)"
 }}"""
 
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=900,
+            max_tokens=1100,
             temperature=0.1,
         )
-        text = response.choices[0].message.content.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
+        raw = response.choices[0].message.content.strip()
 
-        # Boş veya null yanıt kontrolü
-        if text.lower() in ("null", "none", ""):
-            print(f"  Kaynak bulunamadı, atlandı ({category_name})")
+        # JSON bloğunu ayıkla
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+
+        if raw.lower() in ("null", "none", ""):
+            print(f"  Güvenilir kampanya bulunamadı, atlandı ({category_name})")
             return None
 
-        deal = json.loads(text)
+        deal = json.loads(raw)
 
-        # Kaynak URL zorunlu — yoksa deal'i geçersiz say
+        # Kaynak URL zorunlu
         kaynak = deal.get("kaynak_url", "")
-        if not kaynak or kaynak in ("null", "None", "") or not kaynak.startswith("http"):
-            print(f"  Doğrulanmış kaynak URL yok, atlandı ({category_name})")
+        if not kaynak or not kaynak.startswith("http"):
+            print(f"  Kaynak URL eksik, atlandı ({category_name})")
             return None
 
+        # Kaynak alıntı zorunlu (en az 15 karakter)
+        alinti = deal.get("kaynak_alinti", "")
+        if not alinti or len(str(alinti)) < 15:
+            print(f"  Kaynak alıntısı eksik, atlandı ({category_name})")
+            return None
+
+        trust_tag = "✓ güvenilir" if _is_trusted(kaynak) else "? bilinmeyen"
+        print(f"  [{trust_tag}] Alıntı: {str(alinti)[:80]}")
         return deal
+
     except Exception as e:
         print(f"  Groq hatası ({category_name}): {e}")
         return None

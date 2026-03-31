@@ -2,6 +2,7 @@ import json
 import os
 import re
 import requests
+from datetime import datetime, timezone, timedelta
 from groq import Groq
 from duckduckgo_search import DDGS
 
@@ -83,6 +84,21 @@ def _fetch_page_text(url: str, max_chars: int = 3500) -> str:
         return ""
 
 
+def _is_recent(date_str: str, max_days: int = 5) -> bool:
+    """Haberin son max_days gün içinde yayınlanıp yayınlanmadığını kontrol eder."""
+    if not date_str:
+        return True  # Tarih bilgisi yoksa geçir (text aramasında tarih gelmez)
+    try:
+        # DuckDuckGo tarihleri genellikle ISO format: "2026-03-31T..."
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        age = datetime.now(timezone.utc) - dt
+        return age.days <= max_days
+    except Exception:
+        return True  # Parse edilemiyorsa geçir
+
+
 def fetch_deal(category_name: str) -> dict | None:
     query = SEARCH_QUERIES.get(
         category_name, f"{category_name} kampanya indirim türkiye 2026"
@@ -92,7 +108,7 @@ def fetch_deal(category_name: str) -> dict | None:
     results = []
     try:
         with DDGS() as ddgs:
-            for r in ddgs.news(query, region="tr-tr", max_results=8):
+            for r in ddgs.news(query, region="tr-tr", max_results=10):
                 results.append({
                     "title": r.get("title", ""),
                     "body":  r.get("body", ""),
@@ -106,11 +122,12 @@ def fetch_deal(category_name: str) -> dict | None:
     if len(results) < 3:
         try:
             with DDGS() as ddgs:
-                for r in ddgs.text(query, region="tr-tr", max_results=8):
+                for r in ddgs.text(query, region="tr-tr", max_results=10):
                     results.append({
                         "title": r.get("title", ""),
                         "body":  r.get("body", ""),
                         "url":   r.get("href", ""),
+                        "date":  "",
                     })
         except Exception as e:
             print(f"  Arama hatası ({category_name}): {e}")
@@ -118,9 +135,18 @@ def fetch_deal(category_name: str) -> dict | None:
     if not results:
         return None
 
-    # 3) Güvenilir siteleri öne al
-    trusted  = [r for r in results if _is_trusted(r.get("url", ""))]
-    others   = [r for r in results if not _is_trusted(r.get("url", ""))]
+    # 3) Eski haberleri filtrele (son 5 günden eski olanları çıkar)
+    recent = [r for r in results if _is_recent(r.get("date", ""), max_days=5)]
+    if not recent:
+        # Hiç güncel haber yoksa son 14 güne genişlet
+        recent = [r for r in results if _is_recent(r.get("date", ""), max_days=14)]
+    if not recent:
+        print(f"  Güncel haber bulunamadı, atlandı ({category_name})")
+        return None
+
+    # 4) Güvenilir siteleri öne al
+    trusted  = [r for r in recent if _is_trusted(r.get("url", ""))]
+    others   = [r for r in recent if not _is_trusted(r.get("url", ""))]
     sorted_r = (trusted + others)[:6]
 
     # 4) En iyi 3 URL'den tam sayfa metnini çekmeyi dene
@@ -156,15 +182,16 @@ def fetch_deal(category_name: str) -> dict | None:
             f"=== KAYNAK SAYFA SONU ===\n"
         )
 
+    today = datetime.now().strftime("%d %B %Y")
     prompt = f"""Sen bir kampanya editörüsün. Aşağıdaki GERÇEK kaynak metinlerden \
 "{category_name}" kategorisinde bir fırsat/kampanya çıkar.
 
 KRİTİK KURALLAR — BUNLARA MUTLAKA UY:
-1. SADECE aşağıdaki kaynak metinlerde kelimesi kelimesine yazan bilgileri kullan. \
-   Hiçbir şey tahmin etme, uydurma.
-2. Fiyat, tarih, indirim oranı: SADECE kaynakta açık rakam varsa doldur; yoksa null.
-3. "kaynak_alinti" alanı ZORUNLU — kampanyayı doğrulayan TAM cümleyi kaynaktan kopyala.
-4. Güvenilir, spesifik bir kampanya bulamazsan tüm yanıtı null döndür.
+1. SADECE aşağıdaki kaynak metinlerde açıkça yazan bilgileri kullan. Hiçbir şey uydurma.
+2. Fiyat, indirim oranı: SADECE kaynakta açık rakam varsa doldur; yoksa null.
+3. "kaynak_alinti" alanına kampanyayı doğrulayan kısa bir cümle veya ifadeyi kaynaktan yaz.
+4. BUGÜN {today}. Eski kampanyaları (1 aydan eski tarihli) paylaşma — null döndür.
+5. Spesifik bir kampanya/indirim/fırsat bulamazsan tüm yanıtı null döndür.
 
 --- ARAMA SONUÇLARI ---
 {snippets_text}
@@ -218,14 +245,14 @@ SADECE geçerli JSON döndür (uygun kaynak yoksa sadece null):
             print(f"  Kaynak URL eksik, atlandı ({category_name})")
             return None
 
-        # Kaynak alıntı zorunlu (en az 15 karakter)
+        # Kaynak alıntı — varsa logla, yoksa uyar ama atmaya devam et
         alinti = deal.get("kaynak_alinti", "")
-        if not alinti or len(str(alinti)) < 15:
-            print(f"  Kaynak alıntısı eksik, atlandı ({category_name})")
-            return None
-
         trust_tag = "✓ güvenilir" if _is_trusted(kaynak) else "? bilinmeyen"
-        print(f"  [{trust_tag}] Alıntı: {str(alinti)[:80]}")
+        if alinti and len(str(alinti)) >= 10:
+            print(f"  [{trust_tag}] Alıntı: {str(alinti)[:80]}")
+        else:
+            print(f"  [{trust_tag}] Alıntı yok — kaynak URL ile devam ediliyor")
+
         return deal
 
     except Exception as e:

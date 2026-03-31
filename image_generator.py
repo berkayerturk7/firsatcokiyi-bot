@@ -89,6 +89,21 @@ def _hex(h: str) -> tuple:
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
+def _truncate(text: str, font, max_w, draw) -> str:
+    """Metni kelime sınırında keser ve '…' ekler."""
+    if draw.textlength(text, font=font) <= max_w:
+        return text
+    words = text.split()
+    result = ""
+    for word in words:
+        test = (result + " " + word).strip() if result else word
+        if draw.textlength(test + "…", font=font) <= max_w:
+            result = test
+        else:
+            break
+    return (result + "…") if result else text[:20] + "…"
+
+
 def _wrap(text, font, max_w, draw, max_lines=2):
     words = text.split()
     lines, cur = [], ""
@@ -227,7 +242,7 @@ def create_post_image(deal: dict, category: dict, pexels_key: str = "") -> str:
         for oz in reversed(ozellikler[:3]):
             y -= 60
             draw.ellipse([(PAD, y + 14), (PAD + 14, y + 28)], fill=acc_rgb)
-            draw.text((PAD + 28, y), oz[:52], font=f_oz, fill=(215, 215, 215))
+            draw.text((PAD + 28, y), _truncate(oz, f_oz, WIDTH - PAD * 2 - 28, draw), font=f_oz, fill=(215, 215, 215))
         y -= 16
         f_label = _load_font(32, bold=True)
         draw.text((PAD, y - 36), "KAMPANYA KOŞULLARI", font=f_label, fill=acc_rgb)
@@ -434,7 +449,7 @@ def create_story_image(deal: dict, category: dict, pexels_key: str = "") -> str:
         for oz in reversed(ozellikler[:3]):
             y -= 70
             draw.ellipse([(PAD, y+16), (PAD+16, y+32)], fill=acc_rgb)
-            draw.text((PAD+30, y), oz[:48], font=f_oz, fill=(215, 215, 215))
+            draw.text((PAD+30, y), _truncate(oz, f_oz, SW - PAD * 2 - 30, draw), font=f_oz, fill=(215, 215, 215))
         y -= 24
 
     # Ayırıcı

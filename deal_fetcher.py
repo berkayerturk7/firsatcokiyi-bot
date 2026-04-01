@@ -8,7 +8,7 @@ from duckduckgo_search import DDGS
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Güvenilir Türk haber ve kampanya siteleri — sadece buralardan kabul et
+# Güvenilir Türk haber ve kampanya siteleri
 TRUSTED_SITES = [
     # Teknoloji haberleri
     "webtekno.com", "donanimhaber.com", "technopat.net", "shiftdelete.net",
@@ -20,32 +20,78 @@ TRUSTED_SITES = [
     "trendyol.com", "hepsiburada.com", "n11.com", "gittigidiyor.com",
     "a101.com.tr", "bim.com.tr", "migros.com.tr", "carrefoursa.com",
     "watsons.com.tr", "gratis.com", "lcw.com", "decathlon.com.tr",
-    "ikea.com", "ciceksepeti.com",
+    "ikea.com", "ciceksepeti.com", "morhipo.com", "boyner.com.tr",
     # Havacılık
     "thy.com", "turkishairlines.com", "pegasusairlines.com", "anadolujet.com",
     # Turizm
     "tatilsepeti.com", "etstur.com", "jolly.com.tr", "obilet.com",
+    "enuygun.com", "biletall.com",
     # Yemek
     "yemeksepeti.com", "getir.com",
     # Akaryakıt / Otomotiv
     "petrolofisi.com.tr", "opet.com.tr", "shell.com.tr", "bp.com.tr",
-    # Haber siteleri
-    "hurriyet.com.tr", "sabah.com.tr", "milliyet.com.tr",
-    "ntv.com.tr", "cnnturk.com", "haberturk.com",
+    "otomobildunyasi.com", "otoban.com", "arabam.com",
+    # Ulusal haber ajansları ve büyük gazeteler
+    "aa.com.tr", "dha.com.tr", "iha.com.tr",
+    "hurriyet.com.tr", "sabah.com.tr", "milliyet.com.tr", "sozcu.com.tr",
+    "ntv.com.tr", "cnnturk.com", "haberturk.com", "t24.com.tr",
     "bloomberght.com", "ekonomim.com", "paraanaliz.com",
+    "internethaber.com", "haberler.com", "timeturk.com",
+    "aksam.com.tr", "takvim.com.tr", "posta.com.tr",
 ]
 
+# Her kategori için birden fazla arama sorgusu — sırasıyla denenir
 SEARCH_QUERIES = {
-    "E-Ticaret":         "trendyol hepsiburada n11 kampanya indirim fırsat 2026",
-    "Havacılık":         "thy pegasus anadolujet uçak bileti kampanya indirim fırsat 2026",
-    "Yemek":             "yemeksepeti getir trendyol yemek indirim kampanya fırsat 2026",
-    "Giyim & Moda":      "lcwaikiki mango zara h&m giyim kampanya indirim 2026",
-    "Teknoloji":         "mediamarkt teknosa vatan samsung apple indirim kampanya 2026",
-    "Sağlık & Güzellik": "watsons gratis farmasi kozmetik cilt bakım kampanya indirim 2026",
-    "Ev & Yaşam":        "ikea ciceksepeti trendyol ev mobilya indirim kampanya 2026",
-    "Spor":              "decathlon intersport spor malzeme indirim kampanya fırsat 2026",
-    "Turizm & Otel":     "tatilsepeti etstur jolly otel tatil erken rezervasyon kampanya 2026",
-    "Otomotiv":          "petrol ofisi opet shell akaryakıt araç kampanya indirim 2026",
+    "E-Ticaret": [
+        "trendyol hepsiburada indirim kampanya fırsat bugün",
+        "e-ticaret online alışveriş indirim kampanya türkiye",
+        "hepsiburada trendyol n11 fırsat güncel",
+    ],
+    "Havacılık": [
+        "uçak bileti kampanya indirim thy pegasus",
+        "pegasus anadolujet uçuş fırsat bilet indirimi",
+        "türk hava yolları ucuz bilet kampanya",
+    ],
+    "Yemek": [
+        "yemeksepeti getir indirim kampanya kod",
+        "restoran yemek siparişi indirim fırsat",
+        "yemeksepeti getir trendyol yemek kampanya",
+    ],
+    "Giyim & Moda": [
+        "lcwaikiki koton mango zara giyim indirim",
+        "giyim moda kampanya indirim türkiye",
+        "boyner morhipo giyim fırsat indirim",
+    ],
+    "Teknoloji": [
+        "mediamarkt teknosa telefon laptop indirim kampanya",
+        "samsung apple akıllı telefon indirim türkiye",
+        "vatan bilgisayar teknoloji ürün kampanya",
+    ],
+    "Sağlık & Güzellik": [
+        "watsons gratis kozmetik parfüm indirim kampanya",
+        "farmasi avon cilt bakım saç ürün indirim",
+        "eczane ilaç vitamin takviye kampanya",
+    ],
+    "Ev & Yaşam": [
+        "ikea ev mobilya dekorasyon indirim kampanya",
+        "ciceksepeti ev yaşam ürünü fırsat indirim",
+        "trendyol hepsiburada ev gereçleri kampanya",
+    ],
+    "Spor": [
+        "decathlon spor malzeme indirim kampanya",
+        "nike adidas spor ayakkabı giyim indirim türkiye",
+        "intersport spor ürün fırsat kampanya",
+    ],
+    "Turizm & Otel": [
+        "tatilsepeti otel erken rezervasyon indirim kampanya",
+        "etstur jolly yurt içi yurt dışı tur fırsat",
+        "enuygun otel uçak tatil indirim kampanya",
+    ],
+    "Otomotiv": [
+        "akaryakıt benzin motorin fiyat indirim",
+        "opet petrol ofisi shell akaryakıt kampanya",
+        "otomobil araç bakım lastik indirim kampanya",
+    ],
 }
 
 
@@ -99,12 +145,8 @@ def _is_recent(date_str: str, max_days: int = 5) -> bool:
         return True  # Parse edilemiyorsa geçir
 
 
-def fetch_deal(category_name: str) -> dict | None:
-    query = SEARCH_QUERIES.get(
-        category_name, f"{category_name} kampanya indirim türkiye 2026"
-    )
-
-    # 1) DuckDuckGo haber araması
+def _search_results(query: str) -> list:
+    """Bir sorgu için DuckDuckGo haber + metin araması yapar."""
     results = []
     try:
         with DDGS() as ddgs:
@@ -117,8 +159,6 @@ def fetch_deal(category_name: str) -> dict | None:
                 })
     except Exception:
         pass
-
-    # 2) Yeterli sonuç yoksa metin aramasıyla tamamla
     if len(results) < 3:
         try:
             with DDGS() as ddgs:
@@ -129,35 +169,63 @@ def fetch_deal(category_name: str) -> dict | None:
                         "url":   r.get("href", ""),
                         "date":  "",
                     })
-        except Exception as e:
-            print(f"  Arama hatası ({category_name}): {e}")
+        except Exception:
+            pass
+    return results
 
-    if not results:
+
+def fetch_deal(category_name: str) -> dict | None:
+    queries = SEARCH_QUERIES.get(
+        category_name,
+        [f"{category_name} kampanya indirim türkiye bugün"]
+    )
+
+    # 1) Sırayla sorguları dene, yeterli güncel sonuç bulunana kadar
+    all_results = []
+    for query in queries:
+        res = _search_results(query)
+        all_results.extend(res)
+        # Tekrar eden URL'leri çıkar
+        seen = set()
+        unique = []
+        for r in all_results:
+            if r["url"] not in seen:
+                seen.add(r["url"])
+                unique.append(r)
+        all_results = unique
+
+        # Yeterli güncel sonuç varsa dur
+        recent_check = [r for r in all_results if _is_recent(r.get("date", ""), max_days=7)]
+        if len(recent_check) >= 3:
+            break
+
+    if not all_results:
         return None
 
-    # 3) Eski haberleri filtrele (son 5 günden eski olanları çıkar)
-    recent = [r for r in results if _is_recent(r.get("date", ""), max_days=5)]
+    # 2) Tarih filtresi
+    recent = [r for r in all_results if _is_recent(r.get("date", ""), max_days=7)]
     if not recent:
-        # Hiç güncel haber yoksa son 14 güne genişlet
-        recent = [r for r in results if _is_recent(r.get("date", ""), max_days=14)]
+        recent = [r for r in all_results if _is_recent(r.get("date", ""), max_days=14)]
     if not recent:
-        print(f"  Güncel haber bulunamadı, atlandı ({category_name})")
-        return None
+        # Tarih bilgisi olmayan sonuçları da kabul et (text search sonuçları)
+        recent = [r for r in all_results if not r.get("date")]
+    if not recent:
+        recent = all_results  # Son çare: hepsini dene
 
-    # 4) Güvenilir siteleri öne al
+    # 3) Güvenilir siteleri öne al
     trusted  = [r for r in recent if _is_trusted(r.get("url", ""))]
     others   = [r for r in recent if not _is_trusted(r.get("url", ""))]
-    sorted_r = (trusted + others)[:6]
+    sorted_r = (trusted + others)[:8]
 
-    # 4) En iyi 3 URL'den tam sayfa metnini çekmeyi dene
+    # 4) En iyi 5 URL'den tam sayfa metnini çekmeyi dene
     page_content = ""
     source_url   = ""
-    for r in sorted_r[:3]:
+    for r in sorted_r[:5]:
         url = r.get("url", "")
         if not url or not url.startswith("http"):
             continue
         content = _fetch_page_text(url)
-        if len(content) > 300:          # Yeterli içerik
+        if len(content) > 200:
             page_content = content
             source_url   = url
             trust_tag    = "✓ güvenilir" if _is_trusted(url) else "? bilinmeyen"

@@ -58,34 +58,34 @@ SEARCH_QUERIES = {
         "yemeksepeti getir trendyol yemek kampanya",
     ],
     "Giyim & Moda": [
-        "lcwaikiki koton mango zara giyim indirim",
-        "giyim moda kampanya indirim türkiye",
-        "boyner morhipo giyim fırsat indirim",
+        "lcwaikiki koton giyim indirim kampanya site:lcw.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
+        "giyim moda indirim kampanya türkiye site:webtekno.com OR site:haberler.com",
+        "boyner morhipo giyim fırsat indirim site:boyner.com.tr OR site:morhipo.com",
     ],
     "Teknoloji": [
-        "mediamarkt teknosa telefon laptop indirim kampanya",
-        "samsung apple akıllı telefon indirim türkiye",
-        "vatan bilgisayar teknoloji ürün kampanya",
+        "telefon laptop indirim kampanya site:mediamarkt.com.tr OR site:teknosa.com OR site:webtekno.com",
+        "samsung apple indirim türkiye site:donanimhaber.com OR site:shiftdelete.net",
+        "teknoloji ürün kampanya site:vatanbilgisayar.com OR site:chip.com.tr",
     ],
     "Sağlık & Güzellik": [
-        "watsons gratis kozmetik parfüm indirim kampanya",
-        "farmasi avon cilt bakım saç ürün indirim",
-        "eczane ilaç vitamin takviye kampanya",
+        "watsons gratis kozmetik indirim kampanya site:watsons.com.tr OR site:gratis.com OR site:hurriyet.com.tr",
+        "cilt bakım ürün indirim site:sabah.com.tr OR site:milliyet.com.tr",
+        "sağlık güzellik kampanya türkiye site:ntv.com.tr OR site:haberler.com",
     ],
     "Ev & Yaşam": [
-        "ikea ev mobilya dekorasyon indirim kampanya",
-        "ciceksepeti ev yaşam ürünü fırsat indirim",
-        "trendyol hepsiburada ev gereçleri kampanya",
+        "ikea ev mobilya indirim kampanya site:ikea.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
+        "ev yaşam ürünü fırsat site:ciceksepeti.com OR site:haberler.com",
+        "mobilya dekorasyon kampanya site:milliyet.com.tr OR site:ntv.com.tr",
     ],
     "Spor": [
-        "decathlon spor malzeme indirim kampanya",
-        "nike adidas spor ayakkabı giyim indirim türkiye",
-        "intersport spor ürün fırsat kampanya",
+        "decathlon spor indirim kampanya site:decathlon.com.tr OR site:hurriyet.com.tr OR site:sabah.com.tr",
+        "spor malzeme fırsat türkiye site:ntv.com.tr OR site:haberler.com",
+        "nike adidas spor indirim site:webtekno.com OR site:milliyet.com.tr",
     ],
     "Turizm & Otel": [
-        "tatilsepeti otel erken rezervasyon indirim kampanya",
-        "etstur jolly yurt içi yurt dışı tur fırsat",
-        "enuygun otel uçak tatil indirim kampanya",
+        "otel tatil indirim kampanya site:tatilsepeti.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
+        "tur fırsat yurt içi yurt dışı site:etstur.com OR site:enuygun.com",
+        "tatil kampanya rezervasyon site:ntv.com.tr OR site:milliyet.com.tr",
     ],
     "Otomotiv": [
         "akaryakıt benzin motorin fiyat indirim",
@@ -95,8 +95,17 @@ SEARCH_QUERIES = {
 }
 
 
+TURKISH_DOMAINS = (
+    ".com.tr", ".net.tr", ".org.tr", ".biz.tr", ".info.tr",
+    ".gov.tr", ".edu.tr", ".gen.tr", ".web.tr", ".tv.tr",
+)
+
 def _is_trusted(url: str) -> bool:
     return any(site in url for site in TRUSTED_SITES)
+
+def _is_turkish(url: str) -> bool:
+    """URL'nin Türk domain'inden gelip gelmediğini kontrol eder."""
+    return _is_trusted(url) or any(td in url for td in TURKISH_DOMAINS)
 
 
 def _fetch_page_text(url: str, max_chars: int = 3500) -> str:
@@ -202,27 +211,30 @@ def fetch_deal(category_name: str) -> dict | None:
     if not all_results:
         return None
 
-    # 2) Tarih filtresi
-    recent = [r for r in all_results if _is_recent(r.get("date", ""), max_days=7)]
-    if not recent:
-        recent = [r for r in all_results if _is_recent(r.get("date", ""), max_days=14)]
-    if not recent:
-        # Tarih bilgisi olmayan sonuçları da kabul et (text search sonuçları)
-        recent = [r for r in all_results if not r.get("date")]
-    if not recent:
-        recent = all_results  # Son çare: hepsini dene
+    # 2) Sadece Türk domainlerini kabul et — yabancı siteleri çıkar
+    turkish = [r for r in all_results if _is_turkish(r.get("url", ""))]
+    if not turkish:
+        print(f"  Türk domain bulunamadı, atlandı ({category_name})")
+        return None
 
-    # 3) Güvenilir siteleri öne al
+    # 3) Tarih filtresi
+    recent = [r for r in turkish if _is_recent(r.get("date", ""), max_days=7)]
+    if not recent:
+        recent = [r for r in turkish if _is_recent(r.get("date", ""), max_days=14)]
+    if not recent:
+        recent = turkish  # Tarihi olmayan TR sonuçları da kabul et
+
+    # 4) Güvenilir siteleri öne al
     trusted  = [r for r in recent if _is_trusted(r.get("url", ""))]
     others   = [r for r in recent if not _is_trusted(r.get("url", ""))]
     sorted_r = (trusted + others)[:8]
 
-    # 4) En iyi 5 URL'den tam sayfa metnini çekmeyi dene
+    # 5) En iyi 5 Türk URL'den tam sayfa metnini çekmeyi dene
     page_content = ""
     source_url   = ""
     for r in sorted_r[:5]:
         url = r.get("url", "")
-        if not url or not url.startswith("http"):
+        if not url or not url.startswith("http") or not _is_turkish(url):
             continue
         content = _fetch_page_text(url)
         if len(content) > 200:
@@ -232,7 +244,7 @@ def fetch_deal(category_name: str) -> dict | None:
             print(f"  Sayfa çekildi [{trust_tag}]: {url[:70]} ({len(content)} kar)")
             break
 
-    # 5) Snippetler (özet)
+    # 6) Snippetler (özet) — sadece Türk domainleri
     snippets_text = "\n\n".join(
         f"[{i+1}] Başlık: {r['title']}\n"
         f"    Özet  : {r['body']}\n"

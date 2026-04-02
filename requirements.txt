@@ -1,6 +1,6 @@
 Pillow
 requests
 schedule
-duckduckgo-search
+ddgs
 python-dotenv
 groq

@@ -4,7 +4,10 @@ import re
 import requests
 from datetime import datetime, timezone, timedelta
 from groq import Groq
-from duckduckgo_search import DDGS
+try:
+    from ddgs import DDGS
+except ImportError:
+    from duckduckgo_search import DDGS
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -58,34 +61,34 @@ SEARCH_QUERIES = {
         "yemeksepeti getir trendyol yemek kampanya",
     ],
     "Giyim & Moda": [
-        "lcwaikiki koton giyim indirim kampanya site:lcw.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
-        "giyim moda indirim kampanya türkiye site:webtekno.com OR site:haberler.com",
-        "boyner morhipo giyim fırsat indirim site:boyner.com.tr OR site:morhipo.com",
+        "giyim moda indirim kampanya türkiye",
+        "lcwaikiki koton boyner giyim fırsat",
+        "moda alışveriş indirim kampanya",
     ],
     "Teknoloji": [
-        "telefon laptop indirim kampanya site:mediamarkt.com.tr OR site:teknosa.com OR site:webtekno.com",
-        "samsung apple indirim türkiye site:donanimhaber.com OR site:shiftdelete.net",
-        "teknoloji ürün kampanya site:vatanbilgisayar.com OR site:chip.com.tr",
+        "teknoloji telefon laptop indirim kampanya türkiye",
+        "mediamarkt teknosa samsung apple kampanya",
+        "elektronik ürün fırsat indirim türkiye",
     ],
     "Sağlık & Güzellik": [
-        "watsons gratis kozmetik indirim kampanya site:watsons.com.tr OR site:gratis.com OR site:hurriyet.com.tr",
-        "cilt bakım ürün indirim site:sabah.com.tr OR site:milliyet.com.tr",
-        "sağlık güzellik kampanya türkiye site:ntv.com.tr OR site:haberler.com",
+        "kozmetik güzellik sağlık indirim kampanya türkiye",
+        "watsons gratis parfüm cilt bakım kampanya",
+        "eczane vitamin takviye indirim fırsat",
     ],
     "Ev & Yaşam": [
-        "ikea ev mobilya indirim kampanya site:ikea.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
-        "ev yaşam ürünü fırsat site:ciceksepeti.com OR site:haberler.com",
-        "mobilya dekorasyon kampanya site:milliyet.com.tr OR site:ntv.com.tr",
+        "ev mobilya dekorasyon indirim kampanya türkiye",
+        "ikea ev yaşam ürün fırsat kampanya",
+        "beyaz eşya mobilya indirim türkiye",
     ],
     "Spor": [
-        "decathlon spor indirim kampanya site:decathlon.com.tr OR site:hurriyet.com.tr OR site:sabah.com.tr",
-        "spor malzeme fırsat türkiye site:ntv.com.tr OR site:haberler.com",
-        "nike adidas spor indirim site:webtekno.com OR site:milliyet.com.tr",
+        "spor malzeme indirim kampanya türkiye",
+        "decathlon nike adidas spor fırsat",
+        "fitness spor ekipman kampanya türkiye",
     ],
     "Turizm & Otel": [
-        "otel tatil indirim kampanya site:tatilsepeti.com OR site:hurriyet.com.tr OR site:sabah.com.tr",
-        "tur fırsat yurt içi yurt dışı site:etstur.com OR site:enuygun.com",
-        "tatil kampanya rezervasyon site:ntv.com.tr OR site:milliyet.com.tr",
+        "otel tatil indirim kampanya türkiye",
+        "erken rezervasyon tur fırsat tatilsepeti",
+        "yurt içi yurt dışı tatil kampanya",
     ],
     "Otomotiv": [
         "akaryakıt benzin motorin fiyat indirim",

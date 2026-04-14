@@ -9,7 +9,7 @@ load_dotenv()
 
 from deal_fetcher    import fetch_deal
 from image_generator import create_post_image, create_story_image
-from instagram_poster import post_to_instagram, _upload_catbox
+from instagram_poster import post_to_instagram, _upload_image
 import requests
 
 # ─── Konfigürasyon ─────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ def run_daily(dry_run: bool = False):
                 if not dry_run:
                     story_link = deal.get("kaynak_url", "https://www.instagram.com/firsatcokiyi")
                     story_path = create_story_image(deal, category, pexels_key=PEXELS_API_KEY)
-                    story_url = _upload_catbox(story_path)
+                    story_url = _upload_image(story_path, IMGBB_API_KEY)
                     if story_url:
                         _post_story(story_url, story_link)
             else:

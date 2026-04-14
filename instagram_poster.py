@@ -1,9 +1,29 @@
+import base64
 import time
 import requests
 
 
+def _upload_imgbb(image_path: str, api_key: str) -> str | None:
+    """imgbb.com — API key ile yükle, Instagram ile uyumlu"""
+    if not api_key:
+        return None
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    resp = requests.post(
+        "https://api.imgbb.com/1/upload",
+        data={"key": api_key, "image": b64},
+        timeout=60,
+    )
+    if resp.status_code == 200:
+        url = resp.json().get("data", {}).get("url")
+        if url:
+            return url
+    print(f"  imgbb yükleme hatası: {resp.text[:200]}")
+    return None
+
+
 def _upload_catbox(image_path: str) -> str | None:
-    """catbox.moe — ücretsiz, API key gerektirmez, Instagram ile uyumlu"""
+    """catbox.moe — ücretsiz yedek, API key gerektirmez"""
     with open(image_path, "rb") as f:
         resp = requests.post(
             "https://catbox.moe/user/api.php",
@@ -13,8 +33,18 @@ def _upload_catbox(image_path: str) -> str | None:
         )
     if resp.status_code == 200 and resp.text.startswith("https://"):
         return resp.text.strip()
-    print(f"  catbox yükleme hatası: {resp.text}")
+    print(f"  catbox yükleme hatası: {resp.text[:200]}")
     return None
+
+
+def _upload_image(image_path: str, imgbb_api_key: str = "") -> str | None:
+    """imgbb birincil, catbox yedek"""
+    url = _upload_imgbb(image_path, imgbb_api_key)
+    if url:
+        print(f"  imgbb'ye yüklendi ✓")
+        return url
+    print("  imgbb başarısız, catbox deneniyor...")
+    return _upload_catbox(image_path)
 
 
 def post_to_instagram(
@@ -22,10 +52,10 @@ def post_to_instagram(
     caption: str,
     instagram_user_id: str,
     access_token: str,
-    imgbb_api_key: str = "",  # artık kullanılmıyor
+    imgbb_api_key: str = "",
 ) -> bool:
     # 1. Görseli barındır
-    image_url = _upload_catbox(image_path)
+    image_url = _upload_image(image_path, imgbb_api_key)
     if not image_url:
         return False
     print(f"  Görsel URL: {image_url}")

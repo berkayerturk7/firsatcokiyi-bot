@@ -1,50 +1,85 @@
-import base64
 import time
 import requests
 
 
-def _upload_imgbb(image_path: str, api_key: str) -> str | None:
-    """imgbb.com — API key ile yükle, Instagram ile uyumlu"""
-    if not api_key:
-        return None
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-    resp = requests.post(
-        "https://api.imgbb.com/1/upload",
-        data={"key": api_key, "image": b64},
-        timeout=60,
-    )
-    if resp.status_code == 200:
-        url = resp.json().get("data", {}).get("url")
-        if url:
-            return url
-    print(f"  imgbb yükleme hatası: {resp.text[:200]}")
+def _upload_litterbox(image_path: str) -> str | None:
+    """litterbox.catbox.moe — geçici (72 saat), catbox ile aynı CDN, Instagram uyumlu"""
+    try:
+        with open(image_path, "rb") as f:
+            resp = requests.post(
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                data={"reqtype": "fileupload", "time": "72h"},
+                files={"fileToUpload": (image_path, f, "image/jpeg")},
+                timeout=60,
+            )
+        if resp.status_code == 200 and resp.text.startswith("https://"):
+            return resp.text.strip()
+        print(f"  litterbox yükleme hatası: {resp.text[:200]}")
+    except Exception as e:
+        print(f"  litterbox hata: {e}")
+    return None
+
+
+def _upload_0x0(image_path: str) -> str | None:
+    """0x0.st — anonim dosya barındırma, doğrudan URL, Instagram uyumlu"""
+    try:
+        with open(image_path, "rb") as f:
+            resp = requests.post(
+                "https://0x0.st",
+                files={"file": (image_path, f, "image/jpeg")},
+                timeout=60,
+            )
+        if resp.status_code == 200 and resp.text.strip().startswith("https://"):
+            return resp.text.strip()
+        print(f"  0x0.st yükleme hatası: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        print(f"  0x0.st hata: {e}")
     return None
 
 
 def _upload_catbox(image_path: str) -> str | None:
-    """catbox.moe — ücretsiz yedek, API key gerektirmez"""
-    with open(image_path, "rb") as f:
-        resp = requests.post(
-            "https://catbox.moe/user/api.php",
-            data={"reqtype": "fileupload"},
-            files={"fileToUpload": (image_path, f, "image/jpeg")},
-            timeout=60,
-        )
-    if resp.status_code == 200 and resp.text.startswith("https://"):
-        return resp.text.strip()
-    print(f"  catbox yükleme hatası: {resp.text[:200]}")
+    """catbox.moe — bazen kapalı olabiliyor, son yedek"""
+    try:
+        with open(image_path, "rb") as f:
+            resp = requests.post(
+                "https://catbox.moe/user/api.php",
+                data={"reqtype": "fileupload"},
+                files={"fileToUpload": (image_path, f, "image/jpeg")},
+                timeout=60,
+            )
+        if resp.status_code == 200 and resp.text.startswith("https://"):
+            return resp.text.strip()
+        print(f"  catbox yükleme hatası: {resp.text[:200]}")
+    except Exception as e:
+        print(f"  catbox hata: {e}")
     return None
 
 
 def _upload_image(image_path: str, imgbb_api_key: str = "") -> str | None:
-    """imgbb birincil, catbox yedek"""
-    url = _upload_imgbb(image_path, imgbb_api_key)
+    """
+    Öncelik sırası: litterbox → 0x0.st → catbox
+    (imgbb Instagram tarafından kabul edilmiyor — bloke)
+    """
+    print("  litterbox deneniyor...")
+    url = _upload_litterbox(image_path)
     if url:
-        print(f"  imgbb'ye yüklendi ✓")
+        print(f"  litterbox'a yüklendi ✓")
         return url
-    print("  imgbb başarısız, catbox deneniyor...")
-    return _upload_catbox(image_path)
+
+    print("  0x0.st deneniyor...")
+    url = _upload_0x0(image_path)
+    if url:
+        print(f"  0x0.st'ye yüklendi ✓")
+        return url
+
+    print("  catbox deneniyor...")
+    url = _upload_catbox(image_path)
+    if url:
+        print(f"  catbox'a yüklendi ✓")
+        return url
+
+    print("  Tüm görsel barındırma servisleri başarısız!")
+    return None
 
 
 def post_to_instagram(

@@ -43,6 +43,25 @@ def check_env():
         sys.exit(1)
 
 
+def check_token():
+    """Token geçersizse hatayla çık — workflow başarısız görünsün, sessizce 0 post atılmasın."""
+    try:
+        r = requests.get("https://graph.instagram.com/v21.0/me",
+                         params={"fields": "user_id", "access_token": INSTAGRAM_TOKEN},
+                         timeout=20)
+    except requests.RequestException as e:
+        print(f"UYARI: Token kontrolü yapılamadı ({e}), devam ediliyor.")
+        return
+    if r.status_code != 200:
+        try:
+            msg = r.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            msg = f"{r.status_code} {r.text[:200]}"
+        print(f"HATA: Instagram token geçersiz: {msg}")
+        print("Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını güncelleyin.")
+        sys.exit(1)
+
+
 def _post_story(image_url: str, link: str):
     data = {"image_url": image_url, "media_type": "STORIES",
             "access_token": INSTAGRAM_TOKEN, "link_sticker": link}
@@ -131,6 +150,7 @@ if __name__ == "__main__":
         print("TEST MODU — Görsel üretilir ama Instagram'a post atilmaz.\n")
         run_daily(dry_run=True)
     elif "--now" in sys.argv:
+        check_token()
         print("HEMEN çalistiriliyor...\n")
         run_daily(dry_run=False)
     else:

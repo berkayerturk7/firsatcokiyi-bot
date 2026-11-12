@@ -1,0 +1,41 @@
+name: Instagram Token Yenile
+
+# Instagram uzun ömürlü token'ları 60 gün geçerli. Her ayın 1'inde ve 15'inde
+# yenilenir ve INSTAGRAM_TOKEN secret'ı otomatik güncellenir.
+# Gerekli secret: GH_PAT — bu repoda "Secrets: Read and write" izni olan
+# fine-grained Personal Access Token.
+
+on:
+  schedule:
+    - cron: "0 3 1,15 * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Token'ı yenile ve secret'ı güncelle
+        env:
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_PAT secret'ı tanımlı değil, secret güncellenemez."
+            exit 1
+          fi
+
+          resp=$(curl -s -G "https://graph.instagram.com/refresh_access_token" \
+            --data-urlencode "grant_type=ig_refresh_token" \
+            --data-urlencode "access_token=${INSTAGRAM_TOKEN}")
+          new_token=$(echo "$resp" | jq -r '.access_token // empty')
+          if [ -z "$new_token" ]; then
+            echo "Token yenilenemedi. Süresi dolmuş olabilir; Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını elle güncelleyin."
+            echo "$resp" | jq -c '.error // .' || echo "$resp"
+            exit 1
+          fi
+          echo "::add-mask::$new_token"
+
+          printf '%s' "$new_token" | gh secret set INSTAGRAM_TOKEN --repo "${{ github.repository }}"
+          expires_in=$(echo "$resp" | jq -r '.expires_in')
+          echo "INSTAGRAM_TOKEN güncellendi ✓ ($((expires_in / 86400)) gün geçerli)"

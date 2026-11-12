@@ -303,9 +303,10 @@ SADECE geçerli JSON döndür (uygun kaynak yoksa sadece null):
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
+            reasoning_effort="low",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1100,
+            max_tokens=3000,
             temperature=0.1,
         )
         raw = response.choices[0].message.content.strip()

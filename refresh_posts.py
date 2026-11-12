@@ -145,9 +145,10 @@ Sona: 🔗 Detaylar için story'mizdeki linke tıklayın!
 Sadece metni döndür."""
     try:
         resp = groq.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
+            reasoning_effort="low",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=400, temperature=0.4,
+            max_tokens=1500, temperature=0.4,
         )
         return resp.choices[0].message.content.strip()
     except:

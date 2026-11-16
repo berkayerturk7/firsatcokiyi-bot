@@ -1,165 +1,163 @@
+"""Her gün Amazon.com.tr'deki 365/90 günün en düşük fiyatlı ürünlerinden 5 tanesini
+Instagram'a paylaşır.
+
+    python main.py              # tara, görselleri üret, commit+push, Instagram'a yayınla
+    python main.py --dry-run    # sadece tara ve görselleri posts/ altına üret
+"""
+import argparse
+import json
 import os
+import re
+import subprocess
 import sys
 import time
-import schedule
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+from amazon_fetcher import scan, select
+from instagram_poster import check_token, publish
+from post_image import caption, create_post
 
-from deal_fetcher    import fetch_deal
-from image_generator import create_post_image, create_story_image
-from instagram_poster import post_to_instagram, _upload_image
-import requests
+HERE = Path(__file__).resolve().parent
+load_dotenv(HERE / ".env")
 
-# ─── Konfigürasyon ─────────────────────────────────────────────────────────────
 INSTAGRAM_USER_ID = os.getenv("INSTAGRAM_USER_ID", "24422570594030577")
-INSTAGRAM_TOKEN   = os.getenv("INSTAGRAM_TOKEN")
-IMGBB_API_KEY     = os.getenv("IMGBB_API_KEY")
-PEXELS_API_KEY    = os.getenv("PEXELS_API_KEY", "")
-
-CATEGORIES = [
-    {"name": "E-Ticaret"},
-    {"name": "Havacılık"},
-    {"name": "Yemek"},
-    {"name": "Giyim & Moda"},
-    {"name": "Teknoloji"},
-    {"name": "Sağlık & Güzellik"},
-    {"name": "Ev & Yaşam"},
-    {"name": "Spor"},
-    {"name": "Turizm & Otel"},
-    {"name": "Otomotiv"},
-]
-
-POST_DELAY_SECONDS = 35  # Instagram rate limit için postlar arası bekleme
+INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")
+POSTED_PATH = HERE / "posted.json"
+POSTS_DIR = HERE / "posts"
+DAILY_COUNT = 5
+DELAY_BETWEEN_POSTS = 20  # saniye
+TR = timezone(timedelta(hours=3))
 
 
-def check_env():
-    missing = [k for k in ["INSTAGRAM_TOKEN", "GROQ_API_KEY", "IMGBB_API_KEY"]
-               if not os.getenv(k)]
-    if missing:
-        print(f"HATA: Eksik env değişkenleri: {', '.join(missing)}")
-        print("Lütfen .env dosyasını doldurun.")
-        sys.exit(1)
+def git(*args):
+    return subprocess.run(["git", *args], cwd=HERE, check=True,
+                          capture_output=True, text=True).stdout.strip()
 
 
-def check_token():
-    """Token geçersizse hatayla çık — workflow başarısız görünsün, sessizce 0 post atılmasın."""
-    try:
-        r = requests.get("https://graph.instagram.com/v21.0/me",
-                         params={"fields": "user_id", "access_token": INSTAGRAM_TOKEN},
-                         timeout=20)
-    except requests.RequestException as e:
-        print(f"UYARI: Token kontrolü yapılamadı ({e}), devam ediliyor.")
-        return
-    if r.status_code != 200:
+def git_commit_push(paths, message):
+    git("add", *[str(p) for p in paths])
+    if not git("status", "--porcelain", *[str(p) for p in paths]):
+        return git("rev-parse", "HEAD")
+    git("commit", "-m", message)
+    git("pull", "--rebase", "--quiet")
+    git("push", "--quiet")
+    return git("rev-parse", "HEAD")
+
+
+def repo_slug():
+    if os.getenv("GITHUB_REPOSITORY"):
+        return os.environ["GITHUB_REPOSITORY"]
+    url = git("remote", "get-url", "origin")
+    return re.sub(r"(\.git)?$", "", re.sub(r"^.*github\.com[:/]", "", url))
+
+
+def wait_until_public(url, timeout=120):
+    end = time.time() + timeout
+    while time.time() < end:
         try:
-            msg = r.json()["error"]["message"]
-        except (ValueError, KeyError, TypeError):
-            msg = f"{r.status_code} {r.text[:200]}"
-        print(f"HATA: Instagram token geçersiz: {msg}")
-        print("Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını güncelleyin.")
-        sys.exit(1)
-
-
-def _post_story(image_url: str, link: str):
-    data = {"image_url": image_url, "media_type": "STORIES",
-            "access_token": INSTAGRAM_TOKEN, "link_sticker": link}
-    cr = requests.post(f"https://graph.instagram.com/v21.0/{INSTAGRAM_USER_ID}/media",
-                       data=data, timeout=30)
-    if cr.status_code != 200:
-        data.pop("link_sticker")
-        cr = requests.post(f"https://graph.instagram.com/v21.0/{INSTAGRAM_USER_ID}/media",
-                           data=data, timeout=30)
-    if cr.status_code == 200:
+            r = requests.head(url, timeout=15)
+            if r.status_code == 200:
+                return True
+        except requests.RequestException:
+            pass
         time.sleep(5)
-        pr = requests.post(f"https://graph.instagram.com/v21.0/{INSTAGRAM_USER_ID}/media_publish",
-                           data={"creation_id": cr.json()["id"], "access_token": INSTAGRAM_TOKEN},
-                           timeout=30)
-        if pr.status_code == 200:
-            print(f"  Story yayinlandi! ({link[:50]})")
-        else:
-            print(f"  Story yayinlama hatasi.")
+    return False
 
-def run_daily(dry_run: bool = False):
-    print(f"\n{'='*60}")
-    print(f"  Günlük otomasyon başladı — {datetime.now().strftime('%d.%m.%Y %H:%M')}")
-    print(f"{'='*60}\n")
 
-    success_count = 0
+def load_posted():
+    if POSTED_PATH.exists():
+        return json.loads(POSTED_PATH.read_text(encoding="utf-8"))
+    return {}
 
-    for category in CATEGORIES:
-        cat = category["name"]
-        print(f"[{cat}] İşleniyor...")
 
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true", help="Post atmadan sadece görsel üret")
+    ap.add_argument("--count", type=int, default=DAILY_COUNT)
+    args = ap.parse_args()
+
+    today = datetime.now(TR).strftime("%Y-%m-%d")
+    print(f"=== Amazon günlük paylaşım — {today} ===\n")
+
+    if not args.dry_run:
+        if not INSTAGRAM_TOKEN:
+            sys.exit("HATA: INSTAGRAM_TOKEN tanımlı değil.")
+        err = check_token(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+        if err:
+            sys.exit(f"HATA: Instagram token geçersiz: {err}\n"
+                     "Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını güncelleyin.")
+
+    posted = load_posted()
+    print(f"Amazon taranıyor... (daha önce paylaşılan: {len(posted)} ürün)")
+    found = scan()
+    print(f"\n{len(found)} rozetli ürün bulundu "
+          f"(365g: {sum(1 for i in found.values() if i['days'] == 365)}, "
+          f"90g: {sum(1 for i in found.values() if i['days'] == 90)})")
+    if not found:
+        sys.exit("HATA: Amazon'dan hiç ürün alınamadı — istekler engellenmiş olabilir.")
+
+    # Görsel üretimi başarısız olursa yedek adaylara geçebilmek için fazladan seç
+    candidates = select(found, posted, count=args.count + 5)
+    picks = []
+    for it in candidates:
+        if len(picks) == args.count:
+            break
+        path = POSTS_DIR / today / f"{it['asin']}.jpg"
         try:
-            # 1. Fırsat bul
-            deal = fetch_deal(cat)
-            if not deal:
-                print(f"  Fırsat bulunamadı, geçiliyor.\n")
-                continue
-            print(f"  Fırsat: {deal.get('baslik', '-')}")
-
-            # 2. Görsel üret
-            image_path = create_post_image(deal, category, pexels_key=PEXELS_API_KEY)
-
-            if dry_run:
-                print(f"  [DRY RUN] Post atılmadı. Görsel: {image_path}\n")
-                success_count += 1
-                continue
-
-            # 3. Instagram'a post at
-            ok = post_to_instagram(
-                image_path=image_path,
-                caption=deal.get("caption", deal.get("baslik", "")),
-                instagram_user_id=INSTAGRAM_USER_ID,
-                access_token=INSTAGRAM_TOKEN,
-                imgbb_api_key=IMGBB_API_KEY,
-            )
-
-            if ok:
-                success_count += 1
-                print(f"  Feed yayinlandi!")
-
-                # Story — ayrı 9:16 görsel üret ve linki ile at
-                if not dry_run:
-                    story_link = deal.get("kaynak_url", "https://www.instagram.com/firsatcokiyi")
-                    story_path = create_story_image(deal, category, pexels_key=PEXELS_API_KEY)
-                    story_url = _upload_image(story_path, IMGBB_API_KEY)
-                    if story_url:
-                        _post_story(story_url, story_link)
-            else:
-                print(f"  Yayinlama basarisiz.\n")
-
+            create_post(it, path)
         except Exception as e:
-            print(f"  HATA: {e}\n")
+            print(f"  Görsel üretilemedi ({it['asin']}): {e}")
+            continue
+        it["path"] = path
+        picks.append(it)
+        print(f"  [{it['days']}g] -%{it['discount']}  {it['title'][:70]}")
 
-        if not dry_run:
-            time.sleep(POST_DELAY_SECONDS)
+    if not picks:
+        sys.exit("HATA: Paylaşılacak uygun ürün bulunamadı.")
 
-    print(f"{'='*60}")
-    print(f"  Tamamlandi: {success_count}/{len(CATEGORIES)} post basarili")
-    print(f"{'='*60}\n")
+    if args.dry_run:
+        print(f"\n[DRY RUN] {len(picks)} görsel üretildi: {POSTS_DIR / today}")
+        for it in picks:
+            print("\n" + "─" * 60 + "\n" + caption(it))
+        return
+
+    # Görselleri repoya commit'le; Instagram onları raw.githubusercontent.com'dan çeker
+    sha = git_commit_push([it["path"] for it in picks], f"Günün Amazon görselleri: {today}")
+    slug = repo_slug()
+
+    ok = 0
+    for n, it in enumerate(picks, 1):
+        rel = it["path"].relative_to(HERE).as_posix()
+        url = f"https://raw.githubusercontent.com/{slug}/{sha}/{rel}"
+        print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
+        if not wait_until_public(url):
+            print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
+            continue
+        media_id = publish(url, caption(it), INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+        if media_id:
+            ok += 1
+            posted[it["asin"]] = {
+                "date": today, "days": it["days"], "price": it["price"],
+                "old_price": it["old_price"], "discount": it["discount"],
+                "title": it["title"], "media_id": media_id,
+            }
+            POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
+                                   encoding="utf-8")
+            print(f"  ✅ Yayınlandı ({media_id})")
+        if n < len(picks):
+            time.sleep(DELAY_BETWEEN_POSTS)
+
+    if ok:
+        git_commit_push([POSTED_PATH], f"Paylaşılanlar güncellendi: {today} (+{ok})")
+
+    print(f"\n=== Tamamlandı: {ok}/{len(picks)} post yayınlandı ===")
+    if ok == 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    check_env()
-
-    # Argüman yoksa zamanla çalıştır, "--test" varsa hemen çalıştır
-    if "--test" in sys.argv:
-        print("TEST MODU — Görsel üretilir ama Instagram'a post atilmaz.\n")
-        run_daily(dry_run=True)
-    elif "--now" in sys.argv:
-        check_token()
-        print("HEMEN çalistiriliyor...\n")
-        run_daily(dry_run=False)
-    else:
-        print(f"Bot baslatildi. Her gun 09:00'da calisacak.")
-        print(f"Simdi test etmek icin: python main.py --test")
-        print(f"Hemen gercek post atmak icin: python main.py --now\n")
-
-        schedule.every().day.at("09:00").do(run_daily)
-
-        while True:
-            schedule.run_pending()
-            time.sleep(30)
+    main()

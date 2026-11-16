@@ -2,9 +2,16 @@ name: Günlük Instagram Post
 
 on:
   schedule:
-    # Her gün 06:30 UTC = 09:30 Türkiye saati — GitHub gecikmesi (~60-90 dk) ile 10:30-11:00'a denk gelir
-    - cron: "30 6 * * *"
-  workflow_dispatch:  # Manuel tetikleme için
+    # 07:00 UTC = 10:00 Türkiye saati (GitHub zamanlaması gecikebilir)
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write  # görselleri ve posted.json'u repoya commit'lemek için
+
+concurrency:
+  group: daily-post
+  cancel-in-progress: false
 
 jobs:
   post:
@@ -23,25 +30,14 @@ jobs:
       - name: Bağımlılıkları kur
         run: pip install -r requirements.txt
 
-      - name: Sistem fontlarını kur
+      - name: Git kimliği
         run: |
-          sudo apt-get install -y fonts-liberation fonts-dejavu-core fonts-noto-core
-          fc-cache -f -v
+          git config user.name "firsatcokiyi-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Output klasörü oluştur
-        run: mkdir -p output assets/photos assets/fonts
-
-      - name: Inter fontlarını indir
-        run: |
-          curl -sL "https://github.com/rsms/inter/releases/download/v4.0/Inter-Regular.ttf" -o assets/fonts/Inter-Regular.ttf 2>/dev/null || true
-          curl -sL "https://github.com/rsms/inter/releases/download/v4.0/Inter-Bold.ttf" -o assets/fonts/Inter-Bold.ttf 2>/dev/null || true
-          ls -la assets/fonts/ || true
-
-      - name: Günlük post at
+      - name: Günlük Amazon paylaşımları
         env:
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
           INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: python main.py --now
+          PYTHONUNBUFFERED: "1"
+        run: python main.py

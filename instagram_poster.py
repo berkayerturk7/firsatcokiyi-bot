@@ -1,132 +1,51 @@
+"""Herkese açık bir görsel URL'sinden Instagram feed postu yayınlar."""
 import time
+
 import requests
 
+API = "https://graph.instagram.com/v21.0"
 
-def _upload_litterbox(image_path: str) -> str | None:
-    """litterbox.catbox.moe — geçici (72 saat), catbox ile aynı CDN, Instagram uyumlu"""
+
+def check_token(user_id, token):
+    """Token geçerliyse None, değilse hata mesajı döndürür."""
     try:
-        with open(image_path, "rb") as f:
-            resp = requests.post(
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                data={"reqtype": "fileupload", "time": "72h"},
-                files={"fileToUpload": (image_path, f, "image/jpeg")},
-                timeout=60,
-            )
-        if resp.status_code == 200 and resp.text.startswith("https://"):
-            return resp.text.strip()
-        print(f"  litterbox yükleme hatası: {resp.text[:200]}")
-    except Exception as e:
-        print(f"  litterbox hata: {e}")
-    return None
-
-
-def _upload_0x0(image_path: str) -> str | None:
-    """0x0.st — anonim dosya barındırma, doğrudan URL, Instagram uyumlu"""
+        r = requests.get(f"{API}/me", params={"fields": "user_id", "access_token": token}, timeout=20)
+    except requests.RequestException as e:
+        print(f"UYARI: Token kontrolü yapılamadı ({e}), devam ediliyor.")
+        return None
+    if r.status_code == 200:
+        return None
     try:
-        with open(image_path, "rb") as f:
-            resp = requests.post(
-                "https://0x0.st",
-                files={"file": (image_path, f, "image/jpeg")},
-                timeout=60,
-            )
-        if resp.status_code == 200 and resp.text.strip().startswith("https://"):
-            return resp.text.strip()
-        print(f"  0x0.st yükleme hatası: {resp.status_code} {resp.text[:200]}")
-    except Exception as e:
-        print(f"  0x0.st hata: {e}")
-    return None
+        return r.json()["error"]["message"]
+    except (ValueError, KeyError, TypeError):
+        return f"{r.status_code} {r.text[:200]}"
 
 
-def _upload_catbox(image_path: str) -> str | None:
-    """catbox.moe — bazen kapalı olabiliyor, son yedek"""
-    try:
-        with open(image_path, "rb") as f:
-            resp = requests.post(
-                "https://catbox.moe/user/api.php",
-                data={"reqtype": "fileupload"},
-                files={"fileToUpload": (image_path, f, "image/jpeg")},
-                timeout=60,
-            )
-        if resp.status_code == 200 and resp.text.startswith("https://"):
-            return resp.text.strip()
-        print(f"  catbox yükleme hatası: {resp.text[:200]}")
-    except Exception as e:
-        print(f"  catbox hata: {e}")
-    return None
+def publish(image_url, caption, user_id, token):
+    """Postu yayınlar; başarılıysa media id, değilse None döndürür."""
+    c = requests.post(f"{API}/{user_id}/media",
+                      data={"image_url": image_url, "caption": caption, "access_token": token},
+                      timeout=60)
+    if c.status_code != 200:
+        print(f"  Container hatası: {c.text[:300]}")
+        return None
+    cid = c.json()["id"]
 
+    # Instagram görseli indirip işleyene kadar bekle
+    for _ in range(20):
+        s = requests.get(f"{API}/{cid}", params={"fields": "status_code", "access_token": token},
+                         timeout=20).json()
+        status = s.get("status_code")
+        if status == "FINISHED":
+            break
+        if status == "ERROR":
+            print(f"  Instagram görseli işleyemedi: {s}")
+            return None
+        time.sleep(3)
 
-def _upload_image(image_path: str, imgbb_api_key: str = "") -> str | None:
-    """
-    Öncelik sırası: litterbox → 0x0.st → catbox
-    (imgbb Instagram tarafından kabul edilmiyor — bloke)
-    """
-    print("  litterbox deneniyor...")
-    url = _upload_litterbox(image_path)
-    if url:
-        print(f"  litterbox'a yüklendi ✓")
-        return url
-
-    print("  0x0.st deneniyor...")
-    url = _upload_0x0(image_path)
-    if url:
-        print(f"  0x0.st'ye yüklendi ✓")
-        return url
-
-    print("  catbox deneniyor...")
-    url = _upload_catbox(image_path)
-    if url:
-        print(f"  catbox'a yüklendi ✓")
-        return url
-
-    print("  Tüm görsel barındırma servisleri başarısız!")
-    return None
-
-
-def post_to_instagram(
-    image_path: str,
-    caption: str,
-    instagram_user_id: str,
-    access_token: str,
-    imgbb_api_key: str = "",
-) -> bool:
-    # 1. Görseli barındır
-    image_url = _upload_image(image_path, imgbb_api_key)
-    if not image_url:
-        return False
-    print(f"  Görsel URL: {image_url}")
-
-    # 2. Media container oluştur
-    container_resp = requests.post(
-        f"https://graph.instagram.com/v21.0/{instagram_user_id}/media",
-        data={
-            "image_url":    image_url,
-            "caption":      caption,
-            "access_token": access_token,
-        },
-        timeout=30,
-    )
-    if container_resp.status_code != 200:
-        print(f"  Container hatası: {container_resp.text}")
-        return False
-
-    container_id = container_resp.json().get("id")
-    print(f"  Container ID: {container_id}")
-
-    # 3. Container hazır olana kadar bekle
-    time.sleep(8)
-
-    # 4. Yayınla
-    publish_resp = requests.post(
-        f"https://graph.instagram.com/v21.0/{instagram_user_id}/media_publish",
-        data={
-            "creation_id":  container_id,
-            "access_token": access_token,
-        },
-        timeout=30,
-    )
-    if publish_resp.status_code == 200:
-        print(f"  ✅ Yayınlandı! Post ID: {publish_resp.json().get('id')}")
-        return True
-
-    print(f"  Yayınlama hatası: {publish_resp.text}")
-    return False
+    p = requests.post(f"{API}/{user_id}/media_publish",
+                      data={"creation_id": cid, "access_token": token}, timeout=60)
+    if p.status_code != 200:
+        print(f"  Yayınlama hatası: {p.text[:300]}")
+        return None
+    return p.json().get("id")

@@ -106,18 +106,38 @@ def create_post(item, out_path):
     # Amazon'u çağrıştıran turuncu alt çizgi
     d.rounded_rectangle([PAD, top + 48, PAD + aw - 8, top + 54], radius=3, fill=ORANGE)
 
-    badge = f"{item['days']} GÜNÜN EN DÜŞÜK FİYATI"
-    _pill(d, W - PAD, top - 6, badge, _font("Bold", 26), ORANGE, NAVY, anchor_right=True)
+    d.text((W - PAD, top + 40), "@firsatcokiyi", font=_font("SemiBold", 28), fill=GRAY, anchor="rs")
+
+    # ── Rozet şeridi: büyük gün sayısı + "GÜNÜN EN DÜŞÜK FİYATI" ─────────────
+    # 365 günlük: turuncu zemin / lacivert yazı — 90 günlük: lacivert zemin / turuncu yazı
+    bg, fg = (ORANGE, NAVY) if item["days"] == 365 else (NAVY, ORANGE)
+    sub = NAVY if item["days"] == 365 else WHITE
+    b_top, b_h = 150, 190
+    d.rounded_rectangle([PAD, b_top, W - PAD, b_top + b_h], radius=28, fill=bg)
+
+    f_num = _font("ExtraBold", 150)
+    num = str(item["days"])
+    num_w = d.textlength(num, font=f_num)
+    f_l1, f_l2 = _font("Bold", 44), _font("ExtraBold", 62)
+    l1, l2 = "GÜNÜN", "EN DÜŞÜK FİYATI"
+    text_w = max(d.textlength(l2, font=f_l2), d.textlength(l1, font=f_l1))
+    gap = 36
+    x0 = (W - (num_w + gap + text_w)) // 2
+    mid = b_top + b_h // 2
+    d.text((x0, mid), num, font=f_num, fill=fg, anchor="lm")
+    tx = x0 + num_w + gap
+    d.text((tx, mid - 8), l1, font=f_l1, fill=sub, anchor="ls")
+    d.text((tx, mid + 6), l2, font=f_l2, fill=fg, anchor="lt")
 
     # ── Alt bilgi bloğunun yüksekliğini hesapla (blok alta yaslanır) ──────────
     f_title = _font("SemiBold", 40)
     title_lines = _wrap(d, short_title(item["title"]), f_title, W - 2 * PAD, 2)
     brand_h = 44 if item.get("brand") else 0
     block_h = 36 + brand_h + 54 * len(title_lines) + 22 + 118 + 44
-    divider_y = H - 110 - block_h
+    divider_y = H - 64 - block_h
 
     # ── Ürün görseli: üst şerit ile ayraç arasındaki alanı doldurur ─────────
-    photo_top, photo_bottom = 170, divider_y - 40
+    photo_top, photo_bottom = b_top + b_h + 40, divider_y - 36
     box_w, box_h = W - 2 * PAD - 40, photo_bottom - photo_top
     photo = _product_photo(item["image"], box_w, box_h)
     px = (W - photo.width) // 2
@@ -159,7 +179,6 @@ def create_post(item, out_path):
     d.line([PAD + lw, y + 22, PAD + lw + ow, y + 22], fill=GRAY, width=3)
 
     # ── Alt kenar: turuncu çizgi + hesap adı ───────────────────────────────
-    d.text((W - PAD, H - 64), "@firsatcokiyi", font=_font("SemiBold", 28), fill=GRAY, anchor="rs")
     d.rectangle([0, H - 14, W, H], fill=ORANGE)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -169,7 +188,7 @@ def create_post(item, out_path):
 
 def caption(item):
     lines = [
-        f"🔻 Son {item['days']} günün en düşük fiyatı!",
+        f"🔥 SON {item['days']} GÜNÜN EN DÜŞÜK FİYATI 🔥",
         "",
         item["title"],
         "",

@@ -2,8 +2,10 @@ name: Günlük Instagram Post
 
 on:
   schedule:
-    # 07:00 UTC = 10:00 Türkiye saati (GitHub zamanlaması gecikebilir)
+    # Türkiye saati 10:00 ve 14:00 (UTC+3); her çalıştırmada 10 post.
+    # GitHub zamanlaması gecikebilir.
     - cron: "0 7 * * *"
+    - cron: "0 11 * * *"
   workflow_dispatch:
 
 permissions:

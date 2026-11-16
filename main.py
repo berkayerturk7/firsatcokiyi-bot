@@ -1,5 +1,6 @@
-"""Her gün Amazon.com.tr'deki 365/90 günün en düşük fiyatlı ürünlerinden 5 tanesini
-Instagram'a paylaşır.
+"""Amazon.com.tr'deki 365/90 günün en düşük fiyatlı ürünlerinden her çalıştırmada
+10 tanesini Instagram'a paylaşır (günde iki kez: 10:00 ve 14:00). Daha önce
+paylaşılan ürünler posted.json'da tutulur ve bir daha seçilmez.
 
     python main.py              # tara, görselleri üret, commit+push, Instagram'a yayınla
     python main.py --dry-run    # sadece tara ve görselleri posts/ altına üret
@@ -28,7 +29,7 @@ INSTAGRAM_USER_ID = os.getenv("INSTAGRAM_USER_ID", "24422570594030577")
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")
 POSTED_PATH = HERE / "posted.json"
 POSTS_DIR = HERE / "posts"
-DAILY_COUNT = 5
+DAILY_COUNT = 10  # her çalıştırmada (10:00 ve 14:00)
 DELAY_BETWEEN_POSTS = 20  # saniye
 TR = timezone(timedelta(hours=3))
 
@@ -130,29 +131,35 @@ def main():
     slug = repo_slug()
 
     ok = 0
-    for n, it in enumerate(picks, 1):
-        rel = it["path"].relative_to(HERE).as_posix()
-        url = f"https://raw.githubusercontent.com/{slug}/{sha}/{rel}"
-        print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
-        if not wait_until_public(url):
-            print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
-            continue
-        media_id = publish(url, caption(it), INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
-        if media_id:
-            ok += 1
-            posted[it["asin"]] = {
-                "date": today, "days": it["days"], "price": it["price"],
-                "old_price": it["old_price"], "discount": it["discount"],
-                "title": it["title"], "media_id": media_id,
-            }
-            POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
-                                   encoding="utf-8")
-            print(f"  ✅ Yayınlandı ({media_id})")
-        if n < len(picks):
-            time.sleep(DELAY_BETWEEN_POSTS)
-
-    if ok:
-        git_commit_push([POSTED_PATH], f"Paylaşılanlar güncellendi: {today} (+{ok})")
+    try:
+        for n, it in enumerate(picks, 1):
+            rel = it["path"].relative_to(HERE).as_posix()
+            url = f"https://raw.githubusercontent.com/{slug}/{sha}/{rel}"
+            print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
+            if not wait_until_public(url):
+                print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
+                continue
+            try:
+                media_id = publish(url, caption(it), INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+            except requests.RequestException as e:
+                print(f"  Ağ hatası: {e}")
+                media_id = None
+            if media_id:
+                ok += 1
+                posted[it["asin"]] = {
+                    "date": today, "days": it["days"], "price": it["price"],
+                    "old_price": it["old_price"], "discount": it["discount"],
+                    "title": it["title"], "media_id": media_id,
+                }
+                POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
+                                       encoding="utf-8")
+                print(f"  ✅ Yayınlandı ({media_id})")
+            if n < len(picks):
+                time.sleep(DELAY_BETWEEN_POSTS)
+    finally:
+        # Ne olursa olsun paylaşılanları kaydet; sonraki çalıştırma bunları tekrar seçmesin
+        if ok:
+            git_commit_push([POSTED_PATH], f"Paylaşılanlar güncellendi: {today} (+{ok})")
 
     print(f"\n=== Tamamlandı: {ok}/{len(picks)} post yayınlandı ===")
     if ok == 0:

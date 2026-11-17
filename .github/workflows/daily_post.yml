@@ -1,25 +1,23 @@
 name: Günlük Instagram Post
 
-# Asıl tetikleyici: cron-job.org, Türkiye saati 10:00 ve 14:00'te bu workflow'u
-# API ile çalıştırır (inputs.slot = "10" / "14"). GitHub'ın kendi zamanlaması yoğun
-# saatlerde saatlerce gecikebildiği için aşağıdaki schedule yalnızca YEDEK:
-# slot o gün zaten yapıldıysa ya da tetikleme 6 saatten fazla geciktiyse
-# main.py hiçbir şey paylaşmadan çıkar.
+# Türkiye saatiyle 08:00-23:00 arasında saatte bir çalışır. main.py günün kalan
+# paylaşımlarını (günde en fazla 50) kalan saatlere böler; GitHub'ın zamanlaması
+# gecikse ya da bir çalıştırmayı atlasa da sonraki çalıştırmalar açığı kapatır.
+# Her çalıştırmanın özeti günlük bir issue'ya yorum olarak yazılır (e-posta bildirimi).
 
 on:
   workflow_dispatch:
     inputs:
-      slot:
-        description: "Slot: 10, 14, manual (slot kontrolü olmadan) veya auto (saate göre)"
+      count:
+        description: "Kaç post atılsın? Boş bırakılırsa otomatik"
         required: false
-        default: "auto"
+        default: ""
   schedule:
-    # Yedek: 10:17 ve 14:17 TR (saat başı yoğunluğundan kaçınmak için :17)
-    - cron: "17 7 * * *"
-    - cron: "17 11 * * *"
+    - cron: "23 5-19 * * *"  # 08:23 ... 22:23 TR
 
 permissions:
-  contents: write  # görselleri, posted.json, runs.json ve docs/ commit'lemek için
+  contents: write  # görselleri, posted.json ve docs/ commit'lemek için
+  issues: write    # paylaşım raporu (e-posta bildirimi)
 
 concurrency:
   group: daily-post
@@ -51,7 +49,7 @@ jobs:
         env:
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
           INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
-          SLOT: ${{ inputs.slot }}
-          SCHEDULE: ${{ github.event.schedule }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COUNT: ${{ inputs.count }}
           PYTHONUNBUFFERED: "1"
         run: python main.py

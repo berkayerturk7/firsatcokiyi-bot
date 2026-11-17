@@ -53,3 +53,24 @@ def publish(image_url, caption, user_id, token, story=False):
         print(f"  Yayınlama hatası: {p.text[:300]}")
         return None
     return p.json().get("id")
+
+
+def quota_left(user_id, token):
+    """24 saatlik API yayın kotasından kalan hak (bilinmiyorsa None)."""
+    try:
+        r = requests.get(f"{API}/{user_id}/content_publishing_limit",
+                         params={"fields": "config,quota_usage", "access_token": token}, timeout=20)
+        d = r.json()["data"][0]
+        return d["config"]["quota_total"] - d["quota_usage"]
+    except Exception as e:  # kota okunamazsa paylaşımı engelleme
+        print(f"  UYARI: Kota okunamadı ({e})")
+        return None
+
+
+def permalink(media_id, token):
+    try:
+        r = requests.get(f"{API}/{media_id}", params={"fields": "permalink", "access_token": token},
+                         timeout=20)
+        return r.json().get("permalink")
+    except Exception:
+        return None

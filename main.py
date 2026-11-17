@@ -1,6 +1,8 @@
-"""Amazon.com.tr'deki 365/90 günün en düşük fiyatlı ürünlerinden her çalıştırmada
-10 tanesini Instagram'a paylaşır (günde iki kez: 10:00 ve 14:00). Daha önce
-paylaşılan ürünler posted.json'da tutulur ve bir daha seçilmez.
+"""Amazon.com.tr'deki 365/90 günün en düşük fiyatlı ürünlerini Instagram'a paylaşır.
+GitHub Actions gün içinde (TR 08-23) saatte bir çalıştırır; her çalıştırma günün
+kalanını kalan saatlere bölerek günde en fazla DAILY_MAX post atar. Daha önce
+paylaşılan ürünler posted.json'da tutulur ve bir daha seçilmez. Her çalıştırmanın
+özeti GitHub issue yorumu olarak (e-posta bildirimiyle) gönderilir.
 
     python main.py              # tara, görselleri üret, commit+push, Instagram'a yayınla
     python main.py --dry-run    # sadece tara ve görselleri posts/ altına üret
@@ -19,9 +21,10 @@ import requests
 from dotenv import load_dotenv
 
 from amazon_fetcher import scan, select
-from instagram_poster import check_token, publish
+from instagram_poster import check_token, permalink, publish, quota_left
+from notify import notify
 from categories import categorize
-from post_image import caption, create_post, create_story
+from post_image import caption, create_post, create_story, tl
 from bio_page import build as build_site
 
 HERE = Path(__file__).resolve().parent
@@ -32,8 +35,10 @@ INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")
 POSTED_PATH = HERE / "posted.json"
 POSTS_DIR = HERE / "posts"
 SITE_DIR = HERE / "docs"
-RUNS_PATH = HERE / "runs.json"  # hangi gün hangi slotun (10/14) yapıldığı
-DAILY_COUNT = 10  # her çalıştırmada (10:00 ve 14:00)
+STATE_PATH = HERE / "state.json"  # ör. story'lerin API kotasından düşüp düşmediği
+DAILY_MAX = 50  # günlük üst sınır (Instagram API kotası da 24 saatte 50)
+MAX_PER_RUN = 10
+WINDOW = (8, 23)  # TR saatiyle paylaşım penceresi [8:00, 23:00)
 DELAY_BETWEEN_POSTS = 20  # saniye
 TR = timezone(timedelta(hours=3))
 
@@ -79,44 +84,42 @@ def load_posted():
     return {}
 
 
-MAX_SCHEDULE_DELAY = timedelta(hours=6)
+def plan_count(now, posted_today, requested):
+    """Bu çalıştırmada kaç post atılacağı. requested verilmişse (elle tetikleme) o kullanılır;
+    yoksa günün kalanı pencere içindeki kalan saatlere bölünür."""
+    remaining = DAILY_MAX - posted_today
+    if requested:
+        return max(0, min(requested, remaining))
+    if not WINDOW[0] <= now.hour < WINDOW[1]:
+        return 0
+    runs_left = WINDOW[1] - now.hour
+    return max(0, min(MAX_PER_RUN, -(-remaining // runs_left)))
 
 
-def resolve_slot(now):
-    """Bu çalıştırmanın hangi günlük slot olduğunu bulur: "10", "14" ya da "manual".
-
-    - SLOT ortam değişkeni (dış tetikleyiciden ya da elle verilen girdi) önceliklidir.
-    - GitHub zamanlaması (SCHEDULE="17 7 * * *" gibi) için slot cron saatinden çıkarılır;
-      tetikleme 6 saatten fazla gecikmişse (None, gecikme) döner ve çalıştırma atlanır.
-    - Hiçbiri yoksa saate göre: 12:00'den önce "10", sonra "14".
-    """
-    slot = os.getenv("SLOT", "").strip().lower()
-    if slot in ("10", "14", "manual"):
-        return slot, None
-    sched = os.getenv("SCHEDULE", "").strip()
-    if sched:
-        minute, hour_utc = (int(x) for x in sched.split()[:2])
-        local_hour = (hour_utc + 3) % 24
-        intended = now.replace(hour=local_hour, minute=minute, second=0, microsecond=0)
-        late = now - intended
-        if late < timedelta(0):  # gece yarısını geçmiş bir dünkü tetikleme
-            late += timedelta(days=1)
-        if late > MAX_SCHEDULE_DELAY:
-            return None, late
-        return str(local_hour), late
-    return ("10" if now.hour < 12 else "14"), None
-
-
-def load_runs():
-    if RUNS_PATH.exists():
-        return json.loads(RUNS_PATH.read_text(encoding="utf-8"))
-    return {}
+def report(done, failed, posted, stories, posted_today):
+    """E-posta bildirimine gidecek Markdown özet."""
+    lines = [f"**{datetime.now(TR):%H:%M}** — {len(done)} post, {stories} story yayınlandı "
+             f"(bugün toplam {posted_today}/{DAILY_MAX})", ""]
+    for it in done:
+        p = posted[it["asin"]]
+        ig = f"[Instagram]({p['permalink']})" if p.get("permalink") else "Instagram"
+        story = " · story ✓" if p.get("story_id") else ""
+        lines.append(f"- **{it['days']}g** · -%{it['discount']} · {tl(it['price'])} · {it['cat']} — "
+                     f"{it['title'][:80]}  \n  {ig} · [Amazon]({it['url']}){story}")
+    if failed:
+        lines += ["", f"⚠️ {len(failed)} ürün yayınlanamadı (ayrıntı Actions günlüğünde):"]
+        lines += [f"- {it['title'][:80]}" for it in failed]
+    if os.getenv("GITHUB_RUN_ID"):
+        lines += ["", f"[Çalıştırma günlüğü]({os.getenv('GITHUB_SERVER_URL')}/"
+                      f"{os.getenv('GITHUB_REPOSITORY')}/actions/runs/{os.getenv('GITHUB_RUN_ID')})"]
+    return "\n".join(lines)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="Post atmadan sadece görsel üret")
-    ap.add_argument("--count", type=int, default=DAILY_COUNT)
+    ap.add_argument("--count", type=int, default=int(os.getenv("COUNT") or 0) or None,
+                    help="Bu çalıştırmada atılacak post sayısı (varsayılan: otomatik)")
     ap.add_argument("--site", action="store_true", help="Sadece docs/ sayfasını üret")
     args = ap.parse_args()
 
@@ -126,41 +129,49 @@ def main():
 
     now = datetime.now(TR)
     today = now.strftime("%Y-%m-%d")
-    slot, late = resolve_slot(now)
-    print(f"=== Amazon günlük paylaşım — {today}, slot: {slot or '-'} ===\n")
-
-    # Aynı slot iki kez çalışmasın (dış tetikleyici + GitHub yedek zamanlaması)
-    runs = load_runs()
-    if not args.dry_run:
-        if slot is None:
-            print(f"GitHub zamanlaması {late} gecikmiş; slot kaçırıldı, çalıştırma atlanıyor.")
-            return
-        if slot != "manual" and slot in runs.get(today, []):
-            print(f"Bugünün {slot}:00 paylaşımları zaten yapılmış; atlanıyor.")
-            return
+    posted = load_posted()
+    posted_today = sum(1 for v in posted.values() if v.get("date") == today)
+    count = plan_count(now, posted_today, args.count)
+    if args.dry_run:
+        count = args.count or 5
+    print(f"=== Amazon paylaşımı — {now:%Y-%m-%d %H:%M}, bugün {posted_today}/{DAILY_MAX}, "
+          f"bu çalıştırma: {count} ===\n")
+    if count == 0:
+        print("Bu saatte paylaşım yok (pencere dışı ya da günlük sınır doldu).")
+        return
 
     if not args.dry_run:
         if not INSTAGRAM_TOKEN:
             sys.exit("HATA: INSTAGRAM_TOKEN tanımlı değil.")
         err = check_token(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
         if err:
-            sys.exit(f"HATA: Instagram token geçersiz: {err}\n"
-                     "Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını güncelleyin.")
+            msg = (f"Instagram token geçersiz: {err}\n"
+                   "Meta panelinden yeni token alıp INSTAGRAM_TOKEN secret'ını güncelleyin.")
+            notify(repo_slug(), today, "❌ **Paylaşım yapılamadı.** " + msg)
+            sys.exit("HATA: " + msg)
+        left = quota_left(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+        if left is not None:
+            print(f"Instagram 24 saatlik yayın kotasında kalan: {left}")
+            count = min(count, left)
+            if count == 0:
+                print("API kotası dolu; bu çalıştırma atlanıyor.")
+                return
 
-    posted = load_posted()
     print(f"Amazon taranıyor... (daha önce paylaşılan: {len(posted)} ürün)")
     found = scan()
     print(f"\n{len(found)} rozetli ürün bulundu "
           f"(365g: {sum(1 for i in found.values() if i['days'] == 365)}, "
           f"90g: {sum(1 for i in found.values() if i['days'] == 90)})")
     if not found:
+        if not args.dry_run:
+            notify(repo_slug(), today, "❌ Amazon'dan hiç ürün alınamadı — istekler engellenmiş olabilir.")
         sys.exit("HATA: Amazon'dan hiç ürün alınamadı — istekler engellenmiş olabilir.")
 
     # Görsel üretimi başarısız olursa yedek adaylara geçebilmek için fazladan seç
-    candidates = select(found, posted, count=args.count + 5)
+    candidates = select(found, posted, count=count + 5)
     picks = []
     for it in candidates:
-        if len(picks) == args.count:
+        if len(picks) == count:
             break
         it["cat"] = categorize(it)
         it["path"] = POSTS_DIR / today / f"{it['asin']}.jpg"
@@ -175,6 +186,8 @@ def main():
         print(f"  [{it['days']}g] -%{it['discount']}  {it['cat']:<15} {it['title'][:60]}")
 
     if not picks:
+        if not args.dry_run:
+            notify(repo_slug(), today, "⚠️ Paylaşılacak yeni uygun ürün bulunamadı (havuz tükenmiş olabilir).")
         sys.exit("HATA: Paylaşılacak uygun ürün bulunamadı.")
 
     if args.dry_run:
@@ -192,12 +205,15 @@ def main():
         return f"https://raw.githubusercontent.com/{slug}/{sha}/{path.relative_to(HERE).as_posix()}"
 
     ok = stories = 0
+    done, failed = [], []
+    state = json.loads(STATE_PATH.read_text()) if STATE_PATH.exists() else {}
     try:
         for n, it in enumerate(picks, 1):
             print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
             url = raw(it["path"])
             if not wait_until_public(url):
                 print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
+                failed.append(it)
                 continue
             try:
                 media_id = publish(url, caption(it), INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
@@ -205,8 +221,10 @@ def main():
                 print(f"  Ağ hatası: {e}")
                 media_id = None
             if not media_id:
+                failed.append(it)
                 continue
             ok += 1
+            posted_today += 1
             print(f"  ✅ Post yayınlandı ({media_id})")
             posted[it["asin"]] = {
                 "date": today, "posted_at": datetime.now(TR).isoformat(timespec="seconds"),
@@ -214,23 +232,40 @@ def main():
                 "discount": it["discount"], "title": it["title"], "category": it["cat"],
                 "url": it["url"], "thumb": it["image"].replace("_AC_SL1200_", "_AC_SL400_"),
                 "post_image": it["path"].relative_to(HERE).as_posix(), "media_id": media_id,
+                "permalink": permalink(media_id, INSTAGRAM_TOKEN),
             }
+            done.append(it)
             POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
                                    encoding="utf-8")
 
-            # Story — başarısız olsa da feed postu sayılır
-            try:
-                story_id = publish(raw(it["story_path"]), "", INSTAGRAM_USER_ID, INSTAGRAM_TOKEN,
-                                   story=True)
-            except requests.RequestException as e:
-                print(f"  Story ağ hatası: {e}")
+            # Story — başarısız olsa da feed postu sayılır. Story'lerin API kotasından yiyip
+            # yemediği ilk story'de ölçülüp state.json'a yazılır; yiyorsa story sadece günün
+            # kalan postlarına yetecek kota fazlası varsa atılır (öncelik postlarda).
+            uses = state.get("stories_use_quota")
+            before = quota_left(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN) if uses is not False else None
+            if uses and before is not None and before <= DAILY_MAX - posted_today:
+                print(f"  Story atlandı (kotada {before} hak kaldı, postlara ayrıldı)")
                 story_id = None
+            else:
+                try:
+                    story_id = publish(raw(it["story_path"]), "", INSTAGRAM_USER_ID,
+                                       INSTAGRAM_TOKEN, story=True)
+                except requests.RequestException as e:
+                    print(f"  Story ağ hatası: {e}")
+                    story_id = None
             if story_id:
                 stories += 1
                 posted[it["asin"]]["story_id"] = story_id
                 POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
                                        encoding="utf-8")
                 print(f"  ✅ Story yayınlandı [{it['cat']}]")
+                if uses is None and before is not None:
+                    after = quota_left(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+                    if after is not None:
+                        state["stories_use_quota"] = after < before
+                        STATE_PATH.write_text(json.dumps(state, indent=1) + "\n", encoding="utf-8")
+                        print(f"  Story API kotasından {'düşüyor' if after < before else 'düşmüyor'}"
+                              f" ({before} → {after})")
 
             if n < len(picks):
                 time.sleep(DELAY_BETWEEN_POSTS)
@@ -238,15 +273,9 @@ def main():
         # Ne olursa olsun paylaşılanları kaydet; sonraki çalıştırma bunları tekrar seçmesin
         if ok:
             build_site(posted, slug)
-            if slot != "manual":
-                runs.setdefault(today, [])
-                if slot not in runs[today]:
-                    runs[today].append(slot)
-                # Sadece son 14 günü tut
-                runs = dict(sorted(runs.items())[-14:])
-                RUNS_PATH.write_text(json.dumps(runs, indent=1) + "\n", encoding="utf-8")
-            git_commit_push([POSTED_PATH, SITE_DIR, RUNS_PATH],
-                            f"Paylaşılanlar güncellendi: {today} {slot} (+{ok})")
+            git_commit_push([POSTED_PATH, SITE_DIR] + ([STATE_PATH] if STATE_PATH.exists() else []),
+                            f"Paylaşılanlar güncellendi: {today} {now:%H:%M} (+{ok})")
+        notify(slug, today, report(done, failed, posted, stories, posted_today))
 
     print(f"\n=== Tamamlandı: {ok}/{len(picks)} post, {stories} story yayınlandı ===")
     if ok == 0:

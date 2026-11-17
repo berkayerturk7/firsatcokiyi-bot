@@ -1,15 +1,25 @@
 name: Günlük Instagram Post
 
+# Asıl tetikleyici: cron-job.org, Türkiye saati 10:00 ve 14:00'te bu workflow'u
+# API ile çalıştırır (inputs.slot = "10" / "14"). GitHub'ın kendi zamanlaması yoğun
+# saatlerde saatlerce gecikebildiği için aşağıdaki schedule yalnızca YEDEK:
+# slot o gün zaten yapıldıysa ya da tetikleme 6 saatten fazla geciktiyse
+# main.py hiçbir şey paylaşmadan çıkar.
+
 on:
-  schedule:
-    # Türkiye saati 10:00 ve 14:00 (UTC+3); her çalıştırmada 10 post.
-    # GitHub zamanlaması gecikebilir.
-    - cron: "0 7 * * *"
-    - cron: "0 11 * * *"
   workflow_dispatch:
+    inputs:
+      slot:
+        description: "Slot: 10, 14, manual (slot kontrolü olmadan) veya auto (saate göre)"
+        required: false
+        default: "auto"
+  schedule:
+    # Yedek: 10:17 ve 14:17 TR (saat başı yoğunluğundan kaçınmak için :17)
+    - cron: "17 7 * * *"
+    - cron: "17 11 * * *"
 
 permissions:
-  contents: write  # görselleri ve posted.json'u repoya commit'lemek için
+  contents: write  # görselleri, posted.json, runs.json ve docs/ commit'lemek için
 
 concurrency:
   group: daily-post
@@ -37,9 +47,11 @@ jobs:
           git config user.name "firsatcokiyi-bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Günlük Amazon paylaşımları
+      - name: Amazon paylaşımları
         env:
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
           INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          SLOT: ${{ inputs.slot }}
+          SCHEDULE: ${{ github.event.schedule }}
           PYTHONUNBUFFERED: "1"
         run: python main.py

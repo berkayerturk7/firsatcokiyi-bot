@@ -32,6 +32,7 @@ INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")
 POSTED_PATH = HERE / "posted.json"
 POSTS_DIR = HERE / "posts"
 SITE_DIR = HERE / "docs"
+RUNS_PATH = HERE / "runs.json"  # hangi gün hangi slotun (10/14) yapıldığı
 DAILY_COUNT = 10  # her çalıştırmada (10:00 ve 14:00)
 DELAY_BETWEEN_POSTS = 20  # saniye
 TR = timezone(timedelta(hours=3))
@@ -78,6 +79,40 @@ def load_posted():
     return {}
 
 
+MAX_SCHEDULE_DELAY = timedelta(hours=6)
+
+
+def resolve_slot(now):
+    """Bu çalıştırmanın hangi günlük slot olduğunu bulur: "10", "14" ya da "manual".
+
+    - SLOT ortam değişkeni (dış tetikleyiciden ya da elle verilen girdi) önceliklidir.
+    - GitHub zamanlaması (SCHEDULE="17 7 * * *" gibi) için slot cron saatinden çıkarılır;
+      tetikleme 6 saatten fazla gecikmişse (None, gecikme) döner ve çalıştırma atlanır.
+    - Hiçbiri yoksa saate göre: 12:00'den önce "10", sonra "14".
+    """
+    slot = os.getenv("SLOT", "").strip().lower()
+    if slot in ("10", "14", "manual"):
+        return slot, None
+    sched = os.getenv("SCHEDULE", "").strip()
+    if sched:
+        minute, hour_utc = (int(x) for x in sched.split()[:2])
+        local_hour = (hour_utc + 3) % 24
+        intended = now.replace(hour=local_hour, minute=minute, second=0, microsecond=0)
+        late = now - intended
+        if late < timedelta(0):  # gece yarısını geçmiş bir dünkü tetikleme
+            late += timedelta(days=1)
+        if late > MAX_SCHEDULE_DELAY:
+            return None, late
+        return str(local_hour), late
+    return ("10" if now.hour < 12 else "14"), None
+
+
+def load_runs():
+    if RUNS_PATH.exists():
+        return json.loads(RUNS_PATH.read_text(encoding="utf-8"))
+    return {}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="Post atmadan sadece görsel üret")
@@ -89,8 +124,20 @@ def main():
         print(build_site(load_posted(), repo_slug()))
         return
 
-    today = datetime.now(TR).strftime("%Y-%m-%d")
-    print(f"=== Amazon günlük paylaşım — {today} ===\n")
+    now = datetime.now(TR)
+    today = now.strftime("%Y-%m-%d")
+    slot, late = resolve_slot(now)
+    print(f"=== Amazon günlük paylaşım — {today}, slot: {slot or '-'} ===\n")
+
+    # Aynı slot iki kez çalışmasın (dış tetikleyici + GitHub yedek zamanlaması)
+    runs = load_runs()
+    if not args.dry_run:
+        if slot is None:
+            print(f"GitHub zamanlaması {late} gecikmiş; slot kaçırıldı, çalıştırma atlanıyor.")
+            return
+        if slot != "manual" and slot in runs.get(today, []):
+            print(f"Bugünün {slot}:00 paylaşımları zaten yapılmış; atlanıyor.")
+            return
 
     if not args.dry_run:
         if not INSTAGRAM_TOKEN:
@@ -191,8 +238,15 @@ def main():
         # Ne olursa olsun paylaşılanları kaydet; sonraki çalıştırma bunları tekrar seçmesin
         if ok:
             build_site(posted, slug)
-            git_commit_push([POSTED_PATH, SITE_DIR],
-                            f"Paylaşılanlar güncellendi: {today} (+{ok})")
+            if slot != "manual":
+                runs.setdefault(today, [])
+                if slot not in runs[today]:
+                    runs[today].append(slot)
+                # Sadece son 14 günü tut
+                runs = dict(sorted(runs.items())[-14:])
+                RUNS_PATH.write_text(json.dumps(runs, indent=1) + "\n", encoding="utf-8")
+            git_commit_push([POSTED_PATH, SITE_DIR, RUNS_PATH],
+                            f"Paylaşılanlar güncellendi: {today} {slot} (+{ok})")
 
     print(f"\n=== Tamamlandı: {ok}/{len(picks)} post, {stories} story yayınlandı ===")
     if ok == 0:

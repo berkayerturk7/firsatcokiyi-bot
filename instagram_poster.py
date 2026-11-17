@@ -21,11 +21,15 @@ def check_token(user_id, token):
         return f"{r.status_code} {r.text[:200]}"
 
 
-def publish(image_url, caption, user_id, token):
-    """Postu yayınlar; başarılıysa media id, değilse None döndürür."""
-    c = requests.post(f"{API}/{user_id}/media",
-                      data={"image_url": image_url, "caption": caption, "access_token": token},
-                      timeout=60)
+def publish(image_url, caption, user_id, token, story=False):
+    """Feed postu (veya story=True ise story) yayınlar; başarılıysa media id, değilse None.
+    Not: API story'ye link sticker eklemeyi desteklemiyor."""
+    data = {"image_url": image_url, "access_token": token}
+    if story:
+        data["media_type"] = "STORIES"
+    else:
+        data["caption"] = caption
+    c = requests.post(f"{API}/{user_id}/media", data=data, timeout=60)
     if c.status_code != 200:
         print(f"  Container hatası: {c.text[:300]}")
         return None

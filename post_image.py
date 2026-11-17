@@ -93,82 +93,58 @@ def _product_photo(url, box_w, box_h):
     return img
 
 
-def create_post(item, out_path):
-    img = Image.new("RGB", (W, H), WHITE)
-    d = ImageDraw.Draw(img)
-
-    # ── Üst şerit: kaynak + rozet ────────────────────────────────────────────
-    top = 64
+def _header(d, top, width):
+    """Sol: amazon.com.tr  —  Sağ: @firsatcokiyi"""
     f_src = _font("Bold", 34)
     d.text((PAD, top), "amazon", font=f_src, fill=NAVY)
     aw = d.textlength("amazon", font=f_src)
     d.text((PAD + aw, top), ".com.tr", font=_font("Medium", 34), fill=GRAY)
-    # Amazon'u çağrıştıran turuncu alt çizgi
     d.rounded_rectangle([PAD, top + 48, PAD + aw - 8, top + 54], radius=3, fill=ORANGE)
+    d.text((width - PAD, top + 40), "@firsatcokiyi", font=_font("SemiBold", 28), fill=GRAY,
+           anchor="rs")
 
-    d.text((W - PAD, top + 40), "@firsatcokiyi", font=_font("SemiBold", 28), fill=GRAY, anchor="rs")
 
-    # ── Rozet şeridi: büyük gün sayısı + "GÜNÜN EN DÜŞÜK FİYATI" ─────────────
-    # 365 günlük: turuncu zemin / lacivert yazı — 90 günlük: lacivert zemin / turuncu yazı
-    bg, fg = (ORANGE, NAVY) if item["days"] == 365 else (NAVY, ORANGE)
-    sub = NAVY if item["days"] == 365 else WHITE
-    b_top, b_h = 150, 190
-    d.rounded_rectangle([PAD, b_top, W - PAD, b_top + b_h], radius=28, fill=bg)
-
+def _badge_strip(d, top, width, days, height=190):
+    """Büyük gün sayısı + "GÜNÜN EN DÜŞÜK FİYATI".
+    365 günlük: turuncu zemin / lacivert yazı — 90 günlük: lacivert zemin / turuncu yazı."""
+    bg, fg = (ORANGE, NAVY) if days == 365 else (NAVY, ORANGE)
+    sub = NAVY if days == 365 else WHITE
+    d.rounded_rectangle([PAD, top, width - PAD, top + height], radius=28, fill=bg)
     f_num = _font("ExtraBold", 150)
-    num = str(item["days"])
+    num = str(days)
     num_w = d.textlength(num, font=f_num)
     f_l1, f_l2 = _font("Bold", 44), _font("ExtraBold", 62)
     l1, l2 = "GÜNÜN", "EN DÜŞÜK FİYATI"
     text_w = max(d.textlength(l2, font=f_l2), d.textlength(l1, font=f_l1))
     gap = 36
-    x0 = (W - (num_w + gap + text_w)) // 2
-    mid = b_top + b_h // 2
+    x0 = (width - (num_w + gap + text_w)) // 2
+    mid = top + height // 2
     d.text((x0, mid), num, font=f_num, fill=fg, anchor="lm")
     tx = x0 + num_w + gap
     d.text((tx, mid - 8), l1, font=f_l1, fill=sub, anchor="ls")
     d.text((tx, mid + 6), l2, font=f_l2, fill=fg, anchor="lt")
+    return top + height
 
-    # ── Alt bilgi bloğunun yüksekliğini hesapla (blok alta yaslanır) ──────────
-    f_title = _font("SemiBold", 40)
-    title_lines = _wrap(d, short_title(item["title"]), f_title, W - 2 * PAD, 2)
-    brand_h = 44 if item.get("brand") else 0
-    block_h = 36 + brand_h + 54 * len(title_lines) + 22 + 118 + 44
-    divider_y = H - 64 - block_h
 
-    # ── Ürün görseli: üst şerit ile ayraç arasındaki alanı doldurur ─────────
-    photo_top, photo_bottom = b_top + b_h + 40, divider_y - 36
-    box_w, box_h = W - 2 * PAD - 40, photo_bottom - photo_top
-    photo = _product_photo(item["image"], box_w, box_h)
-    px = (W - photo.width) // 2
-    py = photo_top + (box_h - photo.height) // 2
-    img.paste(photo, (px, py), photo)
-
-    # ── Alt bilgi alanı ─────────────────────────────────────────────────────
-    y = divider_y
-    d.line([PAD, y, W - PAD, y], fill=LIGHT, width=2)
-    y += 36
-
+def _info_block(d, item, y, width, title_lines):
+    """Marka, başlık, fiyat, indirim ve eski fiyat; bitişteki y'yi döndürür."""
     if item.get("brand"):
         d.text((PAD, y), item["brand"].upper(), font=_font("SemiBold", 26), fill=GRAY)
-        y += brand_h
-
+        y += 44
+    f_title = _font("SemiBold", 40)
     for line in title_lines:
         d.text((PAD, y), line, font=f_title, fill=NAVY)
         y += 54
     y += 22
 
-    # Fiyat satırı
     f_price = _font("ExtraBold", 96)
     price_txt = tl(item["price"])
     d.text((PAD, y), price_txt, font=f_price, fill=NAVY)
     pw = d.textlength(price_txt, font=f_price)
-
-    f_disc = _font("Bold", 38)
-    disc_txt = f"-%{item['discount']}"
-    _pill(d, PAD + pw + 28, y + 30, disc_txt, f_disc, RED, WHITE, pad_x=20, pad_y=12)
-
+    _pill(d, PAD + pw + 28, y + 30, f"-%{item['discount']}", _font("Bold", 38), RED, WHITE,
+          pad_x=20, pad_y=12)
     y += 118
+
     f_old = _font("Medium", 34)
     old_txt = tl(item["old_price"])
     label = "Önceki fiyat  "
@@ -177,13 +153,76 @@ def create_post(item, out_path):
     d.text((PAD + lw, y), old_txt, font=f_old, fill=GRAY)
     ow = d.textlength(old_txt, font=f_old)
     d.line([PAD + lw, y + 22, PAD + lw + ow, y + 22], fill=GRAY, width=3)
+    return y + 44
 
-    # ── Alt kenar: turuncu çizgi + hesap adı ───────────────────────────────
-    d.rectangle([0, H - 14, W, H], fill=ORANGE)
 
+def _info_height(item, n_title_lines):
+    return (44 if item.get("brand") else 0) + 54 * n_title_lines + 22 + 118 + 44
+
+
+def _paste_photo(img, item, top, bottom, width):
+    box_w, box_h = width - 2 * PAD - 40, bottom - top
+    photo = _product_photo(item["image"], box_w, box_h)
+    img.paste(photo, ((width - photo.width) // 2, top + (box_h - photo.height) // 2), photo)
+
+
+def _save(img, out_path):
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path, "JPEG", quality=90, optimize=True)
     return out_path
+
+
+def create_post(item, out_path):
+    """1080x1350 feed postu."""
+    img = Image.new("RGB", (W, H), WHITE)
+    d = ImageDraw.Draw(img)
+    _header(d, 64, W)
+    badge_bottom = _badge_strip(d, 150, W, item["days"])
+
+    title_lines = _wrap(d, short_title(item["title"]), _font("SemiBold", 40), W - 2 * PAD, 2)
+    divider_y = H - 64 - 36 - _info_height(item, len(title_lines))
+    _paste_photo(img, item, badge_bottom + 40, divider_y - 36, W)
+
+    d.line([PAD, divider_y, W - PAD, divider_y], fill=LIGHT, width=2)
+    _info_block(d, item, divider_y + 36, W, title_lines)
+    d.rectangle([0, H - 14, W, H], fill=ORANGE)
+    return _save(img, out_path)
+
+
+SW, SH = 1080, 1920  # story
+
+
+def create_story(item, category, out_path):
+    """1080x1920 story. Instagram üstte ve altta ~250 px'i kendi arayüzüyle kapatır;
+    içerik bu güvenli alanın içinde tutulur."""
+    img = Image.new("RGB", (SW, SH), WHITE)
+    d = ImageDraw.Draw(img)
+    _header(d, 230, SW)
+
+    # Kategori etiketi — öne çıkanlara eklerken kolay ayırt etmek için
+    f_cat = _font("ExtraBold", 40)
+    cat_txt = category.replace("i", "İ").upper()
+    tw = d.textlength(cat_txt, font=f_cat)
+    cy = 320
+    d.rounded_rectangle([PAD, cy, PAD + tw + 56, cy + 72], radius=36, outline=NAVY, width=4)
+    d.text((PAD + 28, cy + 36), cat_txt, font=f_cat, fill=NAVY, anchor="lm")
+
+    badge_bottom = _badge_strip(d, 420, SW, item["days"])
+
+    # Alt: profil linki çağrısı (güvenli alanın hemen üstü)
+    cta_h, cta_bottom = 110, SH - 260
+    cta_top = cta_bottom - cta_h
+    d.rounded_rectangle([PAD, cta_top, SW - PAD, cta_bottom], radius=cta_h // 2, fill=ORANGE)
+    d.text((SW // 2, cta_top + cta_h // 2), "ÜRÜN LİNKİ PROFİLDE  ↑", font=_font("ExtraBold", 46),
+           fill=NAVY, anchor="mm")
+
+    title_lines = _wrap(d, short_title(item["title"]), _font("SemiBold", 40), SW - 2 * PAD, 2)
+    info_top = cta_top - 56 - _info_height(item, len(title_lines))
+    _paste_photo(img, item, badge_bottom + 50, info_top - 60, SW)
+    d.line([PAD, info_top - 30, SW - PAD, info_top - 30], fill=LIGHT, width=2)
+    _info_block(d, item, info_top, SW, title_lines)
+    d.rectangle([0, SH - 14, SW, SH], fill=ORANGE)
+    return _save(img, out_path)
 
 
 def caption(item):

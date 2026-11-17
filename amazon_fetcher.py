@@ -10,6 +10,8 @@ import sys
 import time
 import urllib.request
 
+from categories import categorize
+
 BASE = "https://www.amazon.com.tr/deals?bubble-id="
 BADGES = {"365 günün en düşük fiyatı": 365, "90 günün en düşük fiyatı": 90}
 
@@ -126,6 +128,7 @@ def _parse(p):
         "image": f"{image['baseUrl']}._AC_SL1200_.{image.get('extension', 'jpg')}"
                  if image.get("baseUrl") else None,
         "condition": p.get("buyingOptionType"),
+        "product_type": (p.get("productCategory") or {}).get("productType"),
         "url": f"https://www.amazon.com.tr/dp/{p['asin']}",
         "category": None,
     }
@@ -172,8 +175,9 @@ def _score(it):
 
 
 def select(found, posted, count=5):
-    """365 ve 90 günlükleri dönüşümlü seçer; daha önce paylaşılanları ve aynı gün
-    aynı marka/kategoriden ikinci ürünü atlar."""
+    """365 ve 90 günlükleri dönüşümlü seçer; daha önce paylaşılanları atlar. Önce her
+    marka ve ana kategoriden (Teknoloji, Moda, Pet...) en fazla bir ürün alır; yetmezse
+    bu kuralı gevşeterek tamamlar."""
     pools = {
         d: sorted((it for it in found.values() if it["days"] == d and _eligible(it, posted)),
                   key=_score, reverse=True)
@@ -187,12 +191,12 @@ def select(found, posted, count=5):
             if it in chosen:
                 continue
             brand = (it.get("brand") or "").lower()
-            if strict and ((brand and brand in brands) or (it["category"] and it["category"] in cats)):
+            cat = categorize(it)
+            if strict and ((brand and brand in brands) or cat in cats):
                 continue
             chosen.append(it)
             brands.add(brand)
-            if it["category"]:
-                cats.add(it["category"])
+            cats.add(cat)
             return True
         return False
 

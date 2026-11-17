@@ -20,7 +20,9 @@ from dotenv import load_dotenv
 
 from amazon_fetcher import scan, select
 from instagram_poster import check_token, publish
-from post_image import caption, create_post
+from categories import categorize
+from post_image import caption, create_post, create_story
+from bio_page import build as build_site
 
 HERE = Path(__file__).resolve().parent
 load_dotenv(HERE / ".env")
@@ -29,6 +31,7 @@ INSTAGRAM_USER_ID = os.getenv("INSTAGRAM_USER_ID", "24422570594030577")
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")
 POSTED_PATH = HERE / "posted.json"
 POSTS_DIR = HERE / "posts"
+SITE_DIR = HERE / "docs"
 DAILY_COUNT = 10  # her çalıştırmada (10:00 ve 14:00)
 DELAY_BETWEEN_POSTS = 20  # saniye
 TR = timezone(timedelta(hours=3))
@@ -79,7 +82,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="Post atmadan sadece görsel üret")
     ap.add_argument("--count", type=int, default=DAILY_COUNT)
+    ap.add_argument("--site", action="store_true", help="Sadece docs/ sayfasını üret")
     args = ap.parse_args()
+
+    if args.site:
+        print(build_site(load_posted(), repo_slug()))
+        return
 
     today = datetime.now(TR).strftime("%Y-%m-%d")
     print(f"=== Amazon günlük paylaşım — {today} ===\n")
@@ -107,35 +115,40 @@ def main():
     for it in candidates:
         if len(picks) == args.count:
             break
-        path = POSTS_DIR / today / f"{it['asin']}.jpg"
+        it["cat"] = categorize(it)
+        it["path"] = POSTS_DIR / today / f"{it['asin']}.jpg"
+        it["story_path"] = POSTS_DIR / today / f"{it['asin']}_story.jpg"
         try:
-            create_post(it, path)
+            create_post(it, it["path"])
+            create_story(it, it["cat"], it["story_path"])
         except Exception as e:
             print(f"  Görsel üretilemedi ({it['asin']}): {e}")
             continue
-        it["path"] = path
         picks.append(it)
-        print(f"  [{it['days']}g] -%{it['discount']}  {it['title'][:70]}")
+        print(f"  [{it['days']}g] -%{it['discount']}  {it['cat']:<15} {it['title'][:60]}")
 
     if not picks:
         sys.exit("HATA: Paylaşılacak uygun ürün bulunamadı.")
 
     if args.dry_run:
-        print(f"\n[DRY RUN] {len(picks)} görsel üretildi: {POSTS_DIR / today}")
+        print(f"\n[DRY RUN] {len(picks)} post + story görseli üretildi: {POSTS_DIR / today}")
         for it in picks:
             print("\n" + "─" * 60 + "\n" + caption(it))
         return
 
     # Görselleri repoya commit'le; Instagram onları raw.githubusercontent.com'dan çeker
-    sha = git_commit_push([it["path"] for it in picks], f"Günün Amazon görselleri: {today}")
+    files = [f for it in picks for f in (it["path"], it["story_path"])]
+    sha = git_commit_push(files, f"Günün Amazon görselleri: {today}")
     slug = repo_slug()
 
-    ok = 0
+    def raw(path):
+        return f"https://raw.githubusercontent.com/{slug}/{sha}/{path.relative_to(HERE).as_posix()}"
+
+    ok = stories = 0
     try:
         for n, it in enumerate(picks, 1):
-            rel = it["path"].relative_to(HERE).as_posix()
-            url = f"https://raw.githubusercontent.com/{slug}/{sha}/{rel}"
             print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
+            url = raw(it["path"])
             if not wait_until_public(url):
                 print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
                 continue
@@ -144,24 +157,44 @@ def main():
             except requests.RequestException as e:
                 print(f"  Ağ hatası: {e}")
                 media_id = None
-            if media_id:
-                ok += 1
-                posted[it["asin"]] = {
-                    "date": today, "days": it["days"], "price": it["price"],
-                    "old_price": it["old_price"], "discount": it["discount"],
-                    "title": it["title"], "media_id": media_id,
-                }
+            if not media_id:
+                continue
+            ok += 1
+            print(f"  ✅ Post yayınlandı ({media_id})")
+            posted[it["asin"]] = {
+                "date": today, "posted_at": datetime.now(TR).isoformat(timespec="seconds"),
+                "days": it["days"], "price": it["price"], "old_price": it["old_price"],
+                "discount": it["discount"], "title": it["title"], "category": it["cat"],
+                "url": it["url"], "thumb": it["image"].replace("_AC_SL1200_", "_AC_SL400_"),
+                "post_image": it["path"].relative_to(HERE).as_posix(), "media_id": media_id,
+            }
+            POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
+                                   encoding="utf-8")
+
+            # Story — başarısız olsa da feed postu sayılır
+            try:
+                story_id = publish(raw(it["story_path"]), "", INSTAGRAM_USER_ID, INSTAGRAM_TOKEN,
+                                   story=True)
+            except requests.RequestException as e:
+                print(f"  Story ağ hatası: {e}")
+                story_id = None
+            if story_id:
+                stories += 1
+                posted[it["asin"]]["story_id"] = story_id
                 POSTED_PATH.write_text(json.dumps(posted, ensure_ascii=False, indent=1) + "\n",
                                        encoding="utf-8")
-                print(f"  ✅ Yayınlandı ({media_id})")
+                print(f"  ✅ Story yayınlandı [{it['cat']}]")
+
             if n < len(picks):
                 time.sleep(DELAY_BETWEEN_POSTS)
     finally:
         # Ne olursa olsun paylaşılanları kaydet; sonraki çalıştırma bunları tekrar seçmesin
         if ok:
-            git_commit_push([POSTED_PATH], f"Paylaşılanlar güncellendi: {today} (+{ok})")
+            build_site(posted, slug)
+            git_commit_push([POSTED_PATH, SITE_DIR],
+                            f"Paylaşılanlar güncellendi: {today} (+{ok})")
 
-    print(f"\n=== Tamamlandı: {ok}/{len(picks)} post yayınlandı ===")
+    print(f"\n=== Tamamlandı: {ok}/{len(picks)} post, {stories} story yayınlandı ===")
     if ok == 0:
         sys.exit(1)
 

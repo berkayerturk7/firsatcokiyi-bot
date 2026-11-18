@@ -1,9 +1,11 @@
 name: Günlük Instagram Post
 
-# Türkiye saatiyle 08:00-23:00 arasında saatte bir çalışır. main.py günün kalan
-# paylaşımlarını (günde en fazla 50) kalan saatlere böler; GitHub'ın zamanlaması
-# gecikse ya da bir çalıştırmayı atlasa da sonraki çalıştırmalar açığı kapatır.
-# Her çalıştırmanın özeti günlük bir issue'ya yorum olarak yazılır (e-posta bildirimi).
+# Türkiye saatiyle 08:00-23:00 arasında saatte bir paylaşım yapar. main.py günün kalan
+# paylaşımlarını (günde en fazla 50) kalan saatlere böler. GitHub'ın kendi zamanlayıcısı
+# bu repoda güvenilmez olduğu için her çalıştırma sonunda next_run.py bir sonraki saate
+# kadar bekleyip workflow'u yeniden tetikler (zincir). Aşağıdaki schedule sadece zincir
+# koparsa yeniden başlatmak için yedek. Her çalıştırmanın özeti günlük bir issue'ya
+# yorum olarak yazılır (e-posta bildirimi).
 
 on:
   workflow_dispatch:
@@ -13,11 +15,13 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: "23 5-19 * * *"  # 08:23 ... 22:23 TR
+    - cron: "23 5 * * *"   # 08:23 TR — yedek
+    - cron: "23 11 * * *"  # 14:23 TR — yedek
 
 permissions:
   contents: write  # görselleri, posted.json ve docs/ commit'lemek için
   issues: write    # paylaşım raporu (e-posta bildirimi)
+  actions: write   # zinciri sürdürmek için workflow'u yeniden tetiklemek
 
 concurrency:
   group: daily-post
@@ -26,6 +30,7 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
 
     steps:
       - name: Kodu al
@@ -53,3 +58,10 @@ jobs:
           COUNT: ${{ inputs.count }}
           PYTHONUNBUFFERED: "1"
         run: python main.py
+
+      - name: Sonraki çalıştırmayı planla
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: python next_run.py

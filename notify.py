@@ -1,5 +1,6 @@
 """Her çalıştırmanın özetini GitHub'da günlük bir issue'ya yorum olarak yazar.
-Issue repo sahibini @mention'ladığı için GitHub her yoruma e-posta bildirimi gönderir."""
+Repoyu "Watch → All activity" ile izleyen hesaba GitHub her yorum için e-posta gönderir
+(kullanıcı adı herkese açık issue'da görünmesin diye mention kullanılmıyor)."""
 import os
 
 import requests
@@ -26,11 +27,10 @@ def notify(slug, day, body):
         issues = [i for i in r.json() if i["title"].startswith(PREFIX) and "pull_request" not in i]
         issue = next((i for i in issues if i["title"] == title), None)
         if issue is None:
-            owner = slug.split("/")[0]
             r = requests.post(f"{GH}/repos/{slug}/issues", headers=_headers(), timeout=20, json={
                 "title": title,
-                "body": f"@{owner} — {day} tarihli Instagram paylaşımları. Botun her "
-                        "çalıştırması bu konuya yorum olarak eklenir.",
+                "body": f"{day} tarihli Instagram paylaşımları. Botun her çalıştırması bu "
+                        "konuya yorum olarak eklenir.",
             })
             r.raise_for_status()
             issue = r.json()

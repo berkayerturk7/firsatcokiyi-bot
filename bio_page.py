@@ -70,7 +70,7 @@ def build(posted, repo_slug):
             <span class="disc">-%{it.get('discount', '')}</span>
           </div>
           <div class="old">Önceki fiyat <s>{_tl(it.get('old_price'))}</s></div>
-          <div class="found">Fırsatı bulduğumuz tarih: <b>{_found_at(it)}</b></div>
+          <div class="found">Fırsatı paylaştığımız tarih: <b>{_found_at(it)}</b></div>
           <a class="btn" href="{html.escape(url)}" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>""")
@@ -132,7 +132,7 @@ def build(posted, repo_slug):
 </div></header>
 <main class="wrap">{''.join(cards)}
 </main>
-<footer>Fiyatlar, fırsatı bulduğumuz anda Amazon.com.tr'den alınmıştır. Amazon'da fiyat farklıysa
+<footer>Fiyatlar, fırsatı paylaştığımız anda Amazon.com.tr'den alınmıştır. Amazon'da fiyat farklıysa
 fırsat sona ermiş olabilir; stok ve fiyat her an değişebilir.</footer>
 <script>
   document.querySelectorAll('.chip').forEach(function (b) {{

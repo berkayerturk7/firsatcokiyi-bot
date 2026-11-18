@@ -5,6 +5,7 @@ Story'lerdeki "ÜRÜN LİNKİ PROFİLDE" çağrısı bu sayfaya yönlendirir.
 """
 import html
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from categories import CATEGORIES, EMOJI
@@ -12,6 +13,17 @@ from categories import CATEGORIES, EMOJI
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "docs" / "index.html"
 MAX_ITEMS = 200
+MAX_AGE = timedelta(days=7)  # paylaşımdan 1 hafta sonra fırsat büyük ihtimalle bitmiştir
+TR = timezone(timedelta(hours=3))
+
+
+def _shared_at(it):
+    stamp = it.get("posted_at") or it.get("date") or ""
+    try:
+        dt = datetime.fromisoformat(stamp)
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=TR)
 
 
 def _tl(v):
@@ -39,9 +51,11 @@ def _found_at(it):
     return out
 
 
-def build(posted, repo_slug):
+def build(posted, repo_slug, now=None):
+    cutoff = (now or datetime.now(TR)) - MAX_AGE
     items = sorted(
-        ({"asin": a, **v} for a, v in posted.items()),
+        ({"asin": a, **v} for a, v in posted.items()
+         if (_shared_at(v) or cutoff) > cutoff),
         key=lambda it: (it.get("date", ""), it.get("posted_at", "")),
         reverse=True,
     )[:MAX_ITEMS]
@@ -55,7 +69,8 @@ def build(posted, repo_slug):
         days = it.get("days", 365)
         url = it.get("url") or f"https://www.amazon.com.tr/dp/{it['asin']}"
         cards.append(f"""
-      <article class="card" data-cat="{html.escape(cat)}" id="{it['asin']}">
+      <article class="card" data-cat="{html.escape(cat)}" id="{it['asin']}"
+        data-q="{html.escape(' '.join([it.get('title', ''), cat]).casefold())}">
         <a class="img" href="{html.escape(url)}" target="_blank" rel="noopener nofollow">
           <img src="{html.escape(thumb)}" alt="" loading="lazy">
         </a>
@@ -121,6 +136,11 @@ def build(posted, repo_slug):
   .found b {{ color:var(--navy); font-weight:600; }}
   .btn {{ display:inline-block; background:var(--orange); color:var(--navy); font-weight:800; font-size:14px; text-decoration:none; padding:9px 16px; border-radius:999px; }}
   footer {{ color:var(--gray); font-size:12px; text-align:center; padding:8px 16px 32px; }}
+  .search {{ display:flex; align-items:center; gap:8px; background:var(--bg); border:1.5px solid var(--line); border-radius:12px; padding:0 12px; margin-bottom:10px; }}
+  .search:focus-within {{ border-color:var(--orange); }}
+  .search svg {{ flex:none; width:18px; height:18px; fill:none; stroke:var(--gray); stroke-width:2.2; stroke-linecap:round; }}
+  .search input {{ flex:1; min-width:0; border:0; background:transparent; font:400 16px Inter,sans-serif; color:var(--navy); padding:11px 0; outline:none; }}
+  .empty {{ text-align:center; color:var(--gray); font-size:14px; padding:32px 16px; }}
   .hide {{ display:none; }}
 </style>
 </head>
@@ -128,21 +148,38 @@ def build(posted, repo_slug):
 <header><div class="wrap">
   <h1>Fırsat Çok İyi <span>· Amazon fırsatları</span></h1>
   <p>Son 365 ve 90 günün en düşük fiyatına düşen ürünler. En yeniler en üstte.</p>
+  <label class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Ürün ara: saat, kulaklık…" autocomplete="off">
+  </label>
   <nav class="chips">{''.join(chips)}</nav>
 </div></header>
 <main class="wrap">{''.join(cards)}
+  <p id="empty" class="empty hide">Aradığın ürün şu an listede yok. Başka bir kelime dene ya da yeni fırsatlar için takipte kal.</p>
 </main>
 <footer>Fiyatlar, fırsatı paylaştığımız anda Amazon.com.tr'den alınmıştır. Amazon'da fiyat farklıysa
 fırsat sona ermiş olabilir; stok ve fiyat her an değişebilir.</footer>
 <script>
+  var cat = '*', q = document.getElementById('q');
+  function norm(t) {{ return t.toLocaleLowerCase('tr').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/ı/g, 'i'); }}
+  document.querySelectorAll('.card').forEach(function (c) {{ c.dataset.n = norm(c.dataset.q); }});
+  function apply() {{
+    var words = norm(q.value).split(/\\s+/).filter(Boolean), shown = 0;
+    document.querySelectorAll('.card').forEach(function (c) {{
+      var ok = (cat === '*' || c.dataset.cat === cat) &&
+               words.every(function (w) {{ return c.dataset.n.indexOf(w) !== -1; }});
+      c.classList.toggle('hide', !ok);
+      if (ok) shown++;
+    }});
+    document.getElementById('empty').classList.toggle('hide', shown > 0);
+  }}
+  q.addEventListener('input', apply);
   document.querySelectorAll('.chip').forEach(function (b) {{
     b.addEventListener('click', function () {{
       document.querySelectorAll('.chip').forEach(function (x) {{ x.classList.remove('on'); }});
       b.classList.add('on');
-      var f = b.dataset.f;
-      document.querySelectorAll('.card').forEach(function (c) {{
-        c.classList.toggle('hide', f !== '*' && c.dataset.cat !== f);
-      }});
+      cat = b.dataset.f;
+      apply();
     }});
   }});
 </script>

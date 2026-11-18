@@ -38,6 +38,11 @@
   .found b { color:var(--navy); font-weight:600; }
   .btn { display:inline-block; background:var(--orange); color:var(--navy); font-weight:800; font-size:14px; text-decoration:none; padding:9px 16px; border-radius:999px; }
   footer { color:var(--gray); font-size:12px; text-align:center; padding:8px 16px 32px; }
+  .search { display:flex; align-items:center; gap:8px; background:var(--bg); border:1.5px solid var(--line); border-radius:12px; padding:0 12px; margin-bottom:10px; }
+  .search:focus-within { border-color:var(--orange); }
+  .search svg { flex:none; width:18px; height:18px; fill:none; stroke:var(--gray); stroke-width:2.2; stroke-linecap:round; }
+  .search input { flex:1; min-width:0; border:0; background:transparent; font:400 16px Inter,sans-serif; color:var(--navy); padding:11px 0; outline:none; }
+  .empty { text-align:center; color:var(--gray); font-size:14px; padding:32px 16px; }
   .hide { display:none; }
 </style>
 </head>
@@ -45,10 +50,15 @@
 <header><div class="wrap">
   <h1>Fırsat Çok İyi <span>· Amazon fırsatları</span></h1>
   <p>Son 365 ve 90 günün en düşük fiyatına düşen ürünler. En yeniler en üstte.</p>
+  <label class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Ürün ara: saat, kulaklık…" autocomplete="off">
+  </label>
   <nav class="chips"><button class="chip on" data-f="*">Tümü</button><button class="chip" data-f="Teknoloji">📱 Teknoloji</button><button class="chip" data-f="Ev &amp; Yaşam">🏠 Ev &amp; Yaşam</button><button class="chip" data-f="Moda">👟 Moda</button><button class="chip" data-f="Sağlık &amp; Bakım">💊 Sağlık &amp; Bakım</button><button class="chip" data-f="Anne &amp; Bebek">🍼 Anne &amp; Bebek</button><button class="chip" data-f="Pet">🐾 Pet</button><button class="chip" data-f="Hobi &amp; Oyuncak">🧸 Hobi &amp; Oyuncak</button><button class="chip" data-f="Kitap &amp; Ofis">📚 Kitap &amp; Ofis</button></nav>
 </div></header>
 <main class="wrap">
-      <article class="card" data-cat="Anne &amp; Bebek" id="B0GYT1XV3M">
+      <article class="card" data-cat="Anne &amp; Bebek" id="B0GYT1XV3M"
+        data-q="prima bebek bezi aktif bebek mega fırsat paketi 6 beden 76 adet anne &amp; bebek">
         <a class="img" href="https://www.amazon.com.tr/dp/B0GYT1XV3M" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/81JiaB7APbL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -67,7 +77,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0GYT1XV3M" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Hobi &amp; Oyuncak" id="B01NBNS2OA">
+      <article class="card" data-cat="Hobi &amp; Oyuncak" id="B01NBNS2OA"
+        data-q="elixir 19027 optiweb custom light elektro gitar teli (9-46) hobi &amp; oyuncak">
         <a class="img" href="https://www.amazon.com.tr/dp/B01NBNS2OA" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/61Uvxtrjf1L._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -86,7 +97,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B01NBNS2OA" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B0CS9T3B8W">
+      <article class="card" data-cat="Teknoloji" id="B0CS9T3B8W"
+        data-q="babilden iphone 15 i̇le uyumlu ekran koruyucu hizalama aparatlı takılırken camın altında kesinlikle toz bırakmayan darbelere karşı ekstra dayanıklı temperli kırılmaz cam koruma teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CS9T3B8W" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/71PC7fQ2FEL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -105,7 +117,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CS9T3B8W" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Sağlık &amp; Bakım" id="B084QXHHKZ">
+      <article class="card" data-cat="Sağlık &amp; Bakım" id="B084QXHHKZ"
+        data-q="ghd helios saç kurutma makinesi, siyah | çok yönlü saç kurutma makinesi, hızlı kuruma için 120 km/saat hava akımı, sessiz ve hafif, daha fazla parlaklık sağlık &amp; bakım">
         <a class="img" href="https://www.amazon.com.tr/dp/B084QXHHKZ" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/41UMW8fX-qL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -124,7 +137,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B084QXHHKZ" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Moda" id="B0GHC3BMM6">
+      <article class="card" data-cat="Moda" id="B0GHC3BMM6"
+        data-q="milano x change mxg3116 kol saati, erkek, yeşil moda">
         <a class="img" href="https://www.amazon.com.tr/dp/B0GHC3BMM6" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/61OeRsBwEOL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -143,7 +157,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0GHC3BMM6" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B0CVXJ1VHT">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B0CVXJ1VHT"
+        data-q="bissell powerwash pet, halı temizleyici, evcil hayvanlarınızdaki kirleri ve alerjenleri giderir, 600 w emiş gücü, hafif, iki tank teknolojisi, kablolu, 3878n ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CVXJ1VHT" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/61jpCz6i2EL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -162,7 +177,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CVXJ1VHT" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Hobi &amp; Oyuncak" id="B0CGJMYM5H">
+      <article class="card" data-cat="Hobi &amp; Oyuncak" id="B0CGJMYM5H"
+        data-q="ernie ball super slinky paradigm 2&#x27;li paket 9-42 hobi &amp; oyuncak">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CGJMYM5H" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/81wSLPIEXaL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -181,7 +197,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CGJMYM5H" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Moda" id="B0CFRBSY48">
+      <article class="card" data-cat="Moda" id="B0CFRBSY48"
+        data-q="milk moo soft cuddles binilebilir çocuk valizi (küçük deniz kızı) moda">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CFRBSY48" target="_blank" rel="noopener nofollow">
           <img src="https://m.media-amazon.com/images/I/61LyiuXlAzL._AC_SL400_.jpg" alt="" loading="lazy">
         </a>
@@ -200,7 +217,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CFRBSY48" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B09T9P4MSL">
+      <article class="card" data-cat="Teknoloji" id="B09T9P4MSL"
+        data-q="rog-strix-1200p-gaming | 80 plus &amp; cybenetics platinum, tam modüler, atx 3.1, pcie 5.1, gan mosfet, gpu öncelikli ivs, 0db teknolojisi, 10-yıl garanti teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B09T9P4MSL" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B09T9P4MSL.jpg" alt="" loading="lazy">
         </a>
@@ -219,7 +237,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B09T9P4MSL" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Pet" id="B0H4ZY19HP">
+      <article class="card" data-cat="Pet" id="B0H4ZY19HP"
+        data-q="purina one sterilcat somonlu kısırlaştırılmış kuru kedi maması 1.4 kg pet">
         <a class="img" href="https://www.amazon.com.tr/dp/B0H4ZY19HP" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B0H4ZY19HP.jpg" alt="" loading="lazy">
         </a>
@@ -238,7 +257,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0H4ZY19HP" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Kitap &amp; Ofis" id="1101965487">
+      <article class="card" data-cat="Kitap &amp; Ofis" id="1101965487"
+        data-q="bantam books a game of thrones / a clash of kings / a storm of swords / a feast for crows / a feast for dragons (buz ve ateşin şarkısı) (buz ve ateşin şarkısı) 5&#x27;li set kitap, 5&#x27;li paket kitap &amp; ofis">
         <a class="img" href="https://www.amazon.com.tr/dp/1101965487" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/1101965487.jpg" alt="" loading="lazy">
         </a>
@@ -257,7 +277,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/1101965487" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Pet" id="B09KC1N3YV">
+      <article class="card" data-cat="Pet" id="B09KC1N3YV"
+        data-q="pro plan live clear yetişkin kısırlaştırılmış kedi maması hindi etli 7 kg pet">
         <a class="img" href="https://www.amazon.com.tr/dp/B09KC1N3YV" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B09KC1N3YV.jpg" alt="" loading="lazy">
         </a>
@@ -276,7 +297,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B09KC1N3YV" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B0DMTHF139">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B0DMTHF139"
+        data-q="fashcolle dynamic grey masajlı oyuncu koltuğu ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B0DMTHF139" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B0DMTHF139.jpg" alt="" loading="lazy">
         </a>
@@ -295,7 +317,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0DMTHF139" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B09PC86FHW">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B09PC86FHW"
+        data-q="alo 10 kg kar çiçeği ferahlğı beyazlar ve renkliler hızlı çözülme toz deterjan ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B09PC86FHW" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B09PC86FHW.jpg" alt="" loading="lazy">
         </a>
@@ -314,7 +337,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B09PC86FHW" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Pet" id="B07VPRKYWD">
+      <article class="card" data-cat="Pet" id="B07VPRKYWD"
+        data-q="pro plan küçük irk yetişkin köpekler i̇çin kuzu etli kuru mama 7 kilogram pet">
         <a class="img" href="https://www.amazon.com.tr/dp/B07VPRKYWD" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B07VPRKYWD.jpg" alt="" loading="lazy">
         </a>
@@ -333,7 +357,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B07VPRKYWD" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B0G1MXRSZ4">
+      <article class="card" data-cat="Teknoloji" id="B0G1MXRSZ4"
+        data-q="gigabyte mo32u2 31,5&quot; qd-oled gaming monitor, 4k uhd (3840x2160), 240hz, 0.03ms gtg, hdmi 2.1 &amp; dp 1.4, displayhdr true black 400, hdr 1000 nits, kvm &amp; usb-c, dahili hoparlör teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B0G1MXRSZ4" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B0G1MXRSZ4.jpg" alt="" loading="lazy">
         </a>
@@ -352,7 +377,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0G1MXRSZ4" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Kitap &amp; Ofis" id="6051984445">
+      <article class="card" data-cat="Kitap &amp; Ofis" id="6051984445"
+        data-q="gece yarısı treni kitap &amp; ofis">
         <a class="img" href="https://www.amazon.com.tr/dp/6051984445" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/6051984445.jpg" alt="" loading="lazy">
         </a>
@@ -371,7 +397,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/6051984445" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Pet" id="B0DM1KV2SN">
+      <article class="card" data-cat="Pet" id="B0DM1KV2SN"
+        data-q="hill&#x27;s sp somon kısırlaştırılmış yetişkin kedi maması 3kg avantajlı paket pet">
         <a class="img" href="https://www.amazon.com.tr/dp/B0DM1KV2SN" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-17/B0DM1KV2SN.jpg" alt="" loading="lazy">
         </a>
@@ -390,7 +417,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0DM1KV2SN" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Moda" id="B0GFGSRHPP">
+      <article class="card" data-cat="Moda" id="B0GFGSRHPP"
+        data-q="camper erkek beetle k300479-011 moda">
         <a class="img" href="https://www.amazon.com.tr/dp/B0GFGSRHPP" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0GFGSRHPP.jpg" alt="" loading="lazy">
         </a>
@@ -409,7 +437,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0GFGSRHPP" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B010Q46PHG">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B010Q46PHG"
+        data-q="songmics banyo rafı 5 katlı bambu dik raf 9 seviyede yüksekliği ayarlanabilir çok fonksiyonlu, oturma odası, koridor, mutfak i̇çin uygun 60x26x130 cm doğal renk bcb35y ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B010Q46PHG" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B010Q46PHG.jpg" alt="" loading="lazy">
         </a>
@@ -428,7 +457,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B010Q46PHG" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Anne &amp; Bebek" id="B0HGT1C4WD">
+      <article class="card" data-cat="Anne &amp; Bebek" id="B0HGT1C4WD"
+        data-q="prima premium care külot bez 7 numara 24 adet bebek bezi anne &amp; bebek">
         <a class="img" href="https://www.amazon.com.tr/dp/B0HGT1C4WD" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0HGT1C4WD.jpg" alt="" loading="lazy">
         </a>
@@ -447,7 +477,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0HGT1C4WD" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B0CV171GSB">
+      <article class="card" data-cat="Teknoloji" id="B0CV171GSB"
+        data-q="varta power on demand power bank 10.000 mah teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CV171GSB" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0CV171GSB.jpg" alt="" loading="lazy">
         </a>
@@ -466,7 +497,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CV171GSB" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B0H4NGG69T">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B0H4NGG69T"
+        data-q="solo ultra tuvalet kağıdı 48&#x27;li ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B0H4NGG69T" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0H4NGG69T.jpg" alt="" loading="lazy">
         </a>
@@ -485,7 +517,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0H4NGG69T" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Moda" id="B0C8K7RT6Y">
+      <article class="card" data-cat="Moda" id="B0C8K7RT6Y"
+        data-q="camper runner four k100226 spor ayakkabıerkek moda">
         <a class="img" href="https://www.amazon.com.tr/dp/B0C8K7RT6Y" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0C8K7RT6Y.jpg" alt="" loading="lazy">
         </a>
@@ -504,7 +537,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0C8K7RT6Y" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B0CZTFD7PG">
+      <article class="card" data-cat="Teknoloji" id="B0CZTFD7PG"
+        data-q="torima l16 pro 153 cm tripod teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B0CZTFD7PG" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0CZTFD7PG.jpg" alt="" loading="lazy">
         </a>
@@ -523,7 +557,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0CZTFD7PG" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Anne &amp; Bebek" id="B0F4KTTBZL">
+      <article class="card" data-cat="Anne &amp; Bebek" id="B0F4KTTBZL"
+        data-q="sleepy aquacare h2o yenidoğan islak bebek havlusu 12x50 anne &amp; bebek">
         <a class="img" href="https://www.amazon.com.tr/dp/B0F4KTTBZL" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0F4KTTBZL.jpg" alt="" loading="lazy">
         </a>
@@ -542,7 +577,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0F4KTTBZL" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Ev &amp; Yaşam" id="B0GQH74G18">
+      <article class="card" data-cat="Ev &amp; Yaşam" id="B0GQH74G18"
+        data-q="stanley quencher h2.0 flowstate tumbler 40oz pipetli termos bardak 1.18 litre - indigo | paslanmaz çelik ev &amp; yaşam">
         <a class="img" href="https://www.amazon.com.tr/dp/B0GQH74G18" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0GQH74G18.jpg" alt="" loading="lazy">
         </a>
@@ -561,7 +597,8 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0GQH74G18" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
-      <article class="card" data-cat="Teknoloji" id="B0B7X6PWMR">
+      <article class="card" data-cat="Teknoloji" id="B0B7X6PWMR"
+        data-q="steelseries arctis nova 1p - multi-platform gaming kulaklık - hi-fi sürücü - 360° surround ses - memory foam kulak yastıkları - gürültü önleyici mikrofon - ps5, ps4, pc, xbox, switch - beyaz teknoloji">
         <a class="img" href="https://www.amazon.com.tr/dp/B0B7X6PWMR" target="_blank" rel="noopener nofollow">
           <img src="https://raw.githubusercontent.com/firsatcokiyi/firsatcokiyi.github.io/main/posts/2026-11-16/B0B7X6PWMR.jpg" alt="" loading="lazy">
         </a>
@@ -580,18 +617,31 @@
           <a class="btn" href="https://www.amazon.com.tr/dp/B0B7X6PWMR" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>
+  <p id="empty" class="empty hide">Aradığın ürün şu an listede yok. Başka bir kelime dene ya da yeni fırsatlar için takipte kal.</p>
 </main>
 <footer>Fiyatlar, fırsatı paylaştığımız anda Amazon.com.tr'den alınmıştır. Amazon'da fiyat farklıysa
 fırsat sona ermiş olabilir; stok ve fiyat her an değişebilir.</footer>
 <script>
+  var cat = '*', q = document.getElementById('q');
+  function norm(t) { return t.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i'); }
+  document.querySelectorAll('.card').forEach(function (c) { c.dataset.n = norm(c.dataset.q); });
+  function apply() {
+    var words = norm(q.value).split(/\s+/).filter(Boolean), shown = 0;
+    document.querySelectorAll('.card').forEach(function (c) {
+      var ok = (cat === '*' || c.dataset.cat === cat) &&
+               words.every(function (w) { return c.dataset.n.indexOf(w) !== -1; });
+      c.classList.toggle('hide', !ok);
+      if (ok) shown++;
+    });
+    document.getElementById('empty').classList.toggle('hide', shown > 0);
+  }
+  q.addEventListener('input', apply);
   document.querySelectorAll('.chip').forEach(function (b) {
     b.addEventListener('click', function () {
       document.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on');
-      var f = b.dataset.f;
-      document.querySelectorAll('.card').forEach(function (c) {
-        c.classList.toggle('hide', f !== '*' && c.dataset.cat !== f);
-      });
+      cat = b.dataset.f;
+      apply();
     });
   });
 </script>

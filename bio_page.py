@@ -1,6 +1,6 @@
 """posted.json'dan bio link sayfasını (docs/index.html) üretir.
 
-GitHub Pages bu klasörü https://<kullanıcı>.github.io/<repo>/ adresinde yayınlar.
+GitHub Pages bu klasörü https://firsatcokiyi.github.io adresinde yayınlar.
 Story'lerdeki "ÜRÜN LİNKİ PROFİLDE" çağrısı bu sayfaya yönlendirir.
 """
 import html
@@ -20,6 +20,23 @@ def _tl(v):
     if abs(v - round(v)) < 0.005:
         return f"{round(v):,}".replace(",", ".") + " TL"
     return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " TL"
+
+
+AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül",
+         "Ekim", "Kasım", "Aralık"]
+
+
+def _found_at(it):
+    """'18 Kasım 2026, 14:17' — posted_at yoksa sadece tarih."""
+    stamp = it.get("posted_at") or it.get("date") or ""
+    try:
+        y, m, d = (int(x) for x in stamp[:10].split("-"))
+    except ValueError:
+        return ""
+    out = f"{d} {AYLAR[m - 1]} {y}"
+    if len(stamp) >= 16 and stamp[10] == "T":
+        out += f", {stamp[11:16]}"
+    return out
 
 
 def build(posted, repo_slug):
@@ -52,7 +69,8 @@ def build(posted, repo_slug):
             <strong>{_tl(it.get('price'))}</strong>
             <span class="disc">-%{it.get('discount', '')}</span>
           </div>
-          <div class="old">Önceki fiyat <s>{_tl(it.get('old_price'))}</s> · {html.escape(it.get('date', ''))}</div>
+          <div class="old">Önceki fiyat <s>{_tl(it.get('old_price'))}</s></div>
+          <div class="found">Fırsatı bulduğumuz tarih: <b>{_found_at(it)}</b></div>
           <a class="btn" href="{html.escape(url)}" target="_blank" rel="noopener nofollow">Amazon'da gör</a>
         </div>
       </article>""")
@@ -98,7 +116,9 @@ def build(posted, repo_slug):
   .price {{ display:flex; align-items:center; gap:8px; }}
   .price strong {{ font-size:22px; font-weight:800; }}
   .disc {{ background:var(--red); color:#fff; font-weight:800; font-size:13px; padding:2px 8px; border-radius:999px; }}
-  .old {{ color:var(--gray); font-size:12px; margin:4px 0 10px; }}
+  .old {{ color:var(--gray); font-size:12px; margin:4px 0 2px; }}
+  .found {{ color:var(--gray); font-size:12px; margin:0 0 10px; }}
+  .found b {{ color:var(--navy); font-weight:600; }}
   .btn {{ display:inline-block; background:var(--orange); color:var(--navy); font-weight:800; font-size:14px; text-decoration:none; padding:9px 16px; border-radius:999px; }}
   footer {{ color:var(--gray); font-size:12px; text-align:center; padding:8px 16px 32px; }}
   .hide {{ display:none; }}
@@ -112,7 +132,8 @@ def build(posted, repo_slug):
 </div></header>
 <main class="wrap">{''.join(cards)}
 </main>
-<footer>Fiyatlar paylaşım anında Amazon.com.tr'den alınmıştır; stok ve fiyat değişebilir.</footer>
+<footer>Fiyatlar, fırsatı bulduğumuz anda Amazon.com.tr'den alınmıştır. Amazon'da fiyat farklıysa
+fırsat sona ermiş olabilir; stok ve fiyat her an değişebilir.</footer>
 <script>
   document.querySelectorAll('.chip').forEach(function (b) {{
     b.addEventListener('click', function () {{

@@ -152,7 +152,7 @@ def main():
         left = quota_left(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
         if left is not None:
             print(f"Instagram 24 saatlik yayın kotasında kalan: {left}")
-            count = min(count, left)
+            count = max(0, min(count, left))
             if count == 0:
                 print("API kotası dolu; bu çalıştırma atlanıyor.")
                 return
@@ -210,6 +210,10 @@ def main():
     try:
         for n, it in enumerate(picks, 1):
             print(f"\n[{n}/{len(picks)}] {it['title'][:70]}")
+            left = quota_left(INSTAGRAM_USER_ID, INSTAGRAM_TOKEN)
+            if left is not None and left <= 0:
+                print("  Instagram 24 saatlik yayın kotası doldu; kalan ürünler sonraki çalıştırmaya.")
+                break
             url = raw(it["path"])
             if not wait_until_public(url):
                 print(f"  Görsel herkese açık adreste görünmüyor (repo public mi?): {url}")
